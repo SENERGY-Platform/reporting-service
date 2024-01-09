@@ -1,0 +1,9 @@
+version: '3.3'
+services:
+  jsreport:
+    image: jsreport/jsreport:4.2.0-full
+    ports:
+      - "5488:5488"
+    restart: unless-stopped
+    volumes:
+      - "./docker/jsreport/data:/app/data/"
