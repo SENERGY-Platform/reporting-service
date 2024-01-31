@@ -26,19 +26,19 @@ import (
 )
 import "github.com/go-resty/resty/v2"
 
-type Server struct {
+type Client struct {
 	Url        string
 	Port       string
 	BaseUrl    string
 	HttpClient *resty.Client
 }
 
-func NewJSReportServer(url string, port string) *Server {
+func NewJSReportClient(url string, port string) *Client {
 	client := resty.New()
-	return &Server{Url: url, Port: port, BaseUrl: fmt.Sprintf("http://%v:%v", url, port), HttpClient: client}
+	return &Client{Url: url, Port: port, BaseUrl: fmt.Sprintf("http://%v:%v", url, port), HttpClient: client}
 }
 
-func (j *Server) GetTemplates() (templates []report_engine.Template, err error) {
+func (j *Client) GetTemplates() (templates []report_engine.Template, err error) {
 	response, err := j.HttpClient.R().Get(j.BaseUrl + "/odata/templates?$select=name")
 	var resp TemplateResponse
 	err = json.Unmarshal(response.Body(), &resp)
@@ -49,7 +49,7 @@ func (j *Server) GetTemplates() (templates []report_engine.Template, err error) 
 	return
 }
 
-func (j *Server) GetTemplateById(templateId string) (template report_engine.Template, err error) {
+func (j *Client) GetTemplateById(templateId string) (template report_engine.Template, err error) {
 	response, err := j.HttpClient.R().Get(j.BaseUrl + "/odata/templates('" + templateId + "')")
 	var resp Template
 	err = json.Unmarshal(response.Body(), &resp)
@@ -109,7 +109,7 @@ func getJsonKeysAndTypes(jsonData map[string]interface{}) (result map[string]rep
 	return
 }
 
-func (j *Server) getTemplateDataByShortId(id string) (data Data, err error) {
+func (j *Client) getTemplateDataByShortId(id string) (data Data, err error) {
 	response, err := j.HttpClient.R().Get(j.BaseUrl + "/odata/data?$filter=" + url.QueryEscape("shortid eq '"+id+"'"))
 	var resp DataResponse
 	err = json.Unmarshal(response.Body(), &resp)
