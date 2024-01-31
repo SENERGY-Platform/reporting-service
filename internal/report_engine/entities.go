@@ -23,7 +23,15 @@ type Template struct {
 }
 
 type Data struct {
-	Name     string `json:"name,omitempty"`
-	Id       string `json:"id,omitempty"`
-	DataJSON string `json:"dataJson,omitempty"`
+	Name           string              `json:"name,omitempty"`
+	Id             string              `json:"id,omitempty"`
+	DataJSONString string              `json:"dataJsonString,omitempty"`
+	DataStructured map[string]DataType `json:"dataStructured,omitempty"`
+}
+type DataType struct {
+	Name      string              `json:"name,omitempty"`
+	ValueType string              `json:"valueType,omitempty"`
+	Length    int                 `json:"length,omitempty"`
+	Fields    map[string]DataType `json:"fields,omitempty"`
+	Children  map[string]DataType `json:"children,omitempty"`
 }

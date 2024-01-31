@@ -20,7 +20,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"reflect"
 	"report-service/internal/report_engine"
+	"strconv"
 )
 import "github.com/go-resty/resty/v2"
 
@@ -60,7 +62,50 @@ func (j *Server) GetTemplateById(templateId string) (template report_engine.Temp
 	template.Name = resp.Name
 	template.Data.Id = jsData.Id
 	template.Data.Name = jsData.Name
-	template.Data.DataJSON = jsData.DataJSON
+	template.Data.DataJSONString = jsData.DataJSON
+	var rawJson map[string]interface{}
+	err = json.Unmarshal([]byte(jsData.DataJSON), &rawJson)
+	if err != nil {
+		return
+	}
+	template.Data.DataStructured = getJsonKeysAndTypes(rawJson)
+	return
+}
+
+func getJsonKeysAndTypes(jsonData map[string]interface{}) (result map[string]report_engine.DataType) {
+	result = make(map[string]report_engine.DataType)
+
+	for key, value := range jsonData {
+		if _, ok := result[key]; !ok {
+			result[key] = report_engine.DataType{}
+		}
+
+		if mapValue, ok := value.(map[string]interface{}); ok { // map
+			getJsonKeysAndTypes(mapValue)
+			result[key] = report_engine.DataType{
+				Name:      key,
+				ValueType: "object",
+				Fields:    getJsonKeysAndTypes(mapValue),
+			}
+		} else if arrayValue, ok := value.([]interface{}); ok { // array
+			childrenMap := make(map[string]interface{})
+			for i := 0; i < len(arrayValue); i++ {
+				childrenMap[strconv.Itoa(i)] = arrayValue[i]
+			}
+			children := getJsonKeysAndTypes(childrenMap)
+			result[key] = report_engine.DataType{
+				Name:      key,
+				ValueType: "array",
+				Length:    len(arrayValue),
+				Children:  children,
+			}
+		} else {
+			result[key] = report_engine.DataType{
+				Name:      key,
+				ValueType: fmt.Sprintf("%v", reflect.TypeOf(value)),
+			}
+		}
+	}
 	return
 }
 
