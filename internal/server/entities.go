@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-package report_engine
+package server
 
-type ReportingDriver interface {
-	GetTemplates() ([]Template, error)
-	GetTemplateById(string) (Template, error)
-	CreateReport(string, map[string]interface{}) error
+type ReportRequest struct {
+	Id   string                 `json:"id,omitempty"`
+	Data map[string]interface{} `json:"data,omitempty"`
 }

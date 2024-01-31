@@ -22,9 +22,10 @@ type TemplateResponse struct {
 }
 
 type Template struct {
-	Name string  `json:"name,omitempty"`
-	Id   string  `json:"_id,omitempty"`
-	Data ShortId `json:"data,omitempty"`
+	Name    string  `json:"name,omitempty"`
+	Id      string  `json:"_id,omitempty"`
+	ShortId string  `json:"shortid,omitempty"`
+	Data    ShortId `json:"data,omitempty"`
 }
 
 type DataResponse struct {
@@ -40,4 +41,9 @@ type Data struct {
 
 type ShortId struct {
 	ShortId string `json:"shortid,omitempty"`
+}
+
+type ErrorResponse struct {
+	Message string `json:"message,omitempty"`
+	Stack   string `json:"stack,omitempty"`
 }

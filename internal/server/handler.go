@@ -49,6 +49,19 @@ func startAPI(reportingClient *report_engine.Client) {
 			"data": template,
 		})
 	})
+	r.POST("/report", func(c *gin.Context) {
+		var request ReportRequest
+		if err := c.ShouldBindJSON(&request); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		err := reportingClient.CreateReport(request.Id, request.Data)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.Status(http.StatusOK)
+	})
 	err := r.Run("127.0.0.1:8080")
 	if err == nil {
 		fmt.Printf("Starting api server failed: %s \n", err)

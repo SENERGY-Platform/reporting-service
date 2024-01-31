@@ -18,7 +18,9 @@ package jsreport
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"reflect"
 	"report-service/internal/report_engine"
@@ -105,6 +107,25 @@ func getJsonKeysAndTypes(jsonData map[string]interface{}) (result map[string]rep
 				ValueType: fmt.Sprintf("%v", reflect.TypeOf(value)),
 			}
 		}
+	}
+	return
+}
+
+func (j *Client) CreateReport(id string, data map[string]interface{}) (err error) {
+	response, err := j.HttpClient.R().
+		SetBody(map[string]interface{}{
+			"template": map[string]interface{}{"name": id},
+			"options":  map[string]interface{}{"reports": map[string]interface{}{"save": true}},
+			"data":     data}).
+		Post(j.BaseUrl + "/api/report")
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	if response.StatusCode() != http.StatusOK {
+		var errorResponse ErrorResponse
+		err = json.Unmarshal(response.Body(), &errorResponse)
+		return errors.New(errorResponse.Message)
 	}
 	return
 }

@@ -33,3 +33,8 @@ func (r *Client) GetTemplateById(id string) (template Template, err error) {
 	template, err = r.Driver.GetTemplateById(id)
 	return
 }
+
+func (r *Client) CreateReport(id string, data map[string]interface{}) (err error) {
+	err = r.Driver.CreateReport(id, data)
+	return
+}
