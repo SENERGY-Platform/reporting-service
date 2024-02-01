@@ -14,18 +14,14 @@
  * limitations under the License.
  */
 
-package main
+package server
 
-import (
-	"github.com/joho/godotenv"
-	"log"
-	"report-service/internal/server"
-)
+import "os"
 
-func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Print("Error loading .env file")
+func GetEnv(key, fallback string) string {
+	value := os.Getenv(key)
+	if len(value) == 0 {
+		return fallback
 	}
-	server.Start()
+	return value
 }

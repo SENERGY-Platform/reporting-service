@@ -16,6 +16,8 @@
 
 package report_engine
 
+import timescaleModels "github.com/SENERGY-Platform/timescale-wrapper/pkg/model"
+
 type Template struct {
 	Name string `json:"name,omitempty"`
 	Id   string `json:"id,omitempty"`
@@ -34,4 +36,12 @@ type DataType struct {
 	Length    int                 `json:"length,omitempty"`
 	Fields    map[string]DataType `json:"fields,omitempty"`
 	Children  map[string]DataType `json:"children,omitempty"`
+}
+
+type ReportObject struct {
+	DataType
+	Value    interface{}                            `json:"value,omitempty"`
+	Query    *timescaleModels.QueriesRequestElement `json:"query,omitempty"`
+	Fields   map[string]ReportObject                `json:"fields,omitempty"`
+	Children map[string]ReportObject                `json:"children,omitempty"`
 }

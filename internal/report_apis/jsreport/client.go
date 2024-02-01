@@ -37,7 +37,7 @@ type Client struct {
 
 func NewJSReportClient(url string, port string) *Client {
 	client := resty.New()
-	return &Client{Url: url, Port: port, BaseUrl: fmt.Sprintf("http://%v:%v", url, port), HttpClient: client}
+	return &Client{Url: url, Port: port, BaseUrl: fmt.Sprintf("%v:%v", url, port), HttpClient: client}
 }
 
 func (j *Client) GetTemplates() (templates []report_engine.Template, err error) {
@@ -83,7 +83,6 @@ func getJsonKeysAndTypes(jsonData map[string]interface{}) (result map[string]rep
 		}
 
 		if mapValue, ok := value.(map[string]interface{}); ok { // map
-			getJsonKeysAndTypes(mapValue)
 			result[key] = report_engine.DataType{
 				Name:      key,
 				ValueType: "object",

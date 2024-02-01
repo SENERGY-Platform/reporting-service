@@ -22,6 +22,8 @@ import (
 )
 
 func Start() {
-	client := report_engine.NewClient(jsreport.NewJSReportClient("localhost", "5488"))
+	client := report_engine.NewClient(jsreport.NewJSReportClient(
+		GetEnv("JSREPORT_SERVER_URL", "http://localhost"),
+		GetEnv("JSREPORT_SERVER_PORT", "5488")))
 	startAPI(client)
 }

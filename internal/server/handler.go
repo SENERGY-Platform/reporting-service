@@ -51,11 +51,12 @@ func startAPI(reportingClient *report_engine.Client) {
 	})
 	r.POST("/report", func(c *gin.Context) {
 		var request ReportRequest
+		authString := c.GetHeader("Authorization")
 		if err := c.ShouldBindJSON(&request); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		err := reportingClient.CreateReport(request.Id, request.Data)
+		err := reportingClient.CreateReport(request.Id, request.Data, authString)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return

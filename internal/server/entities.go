@@ -16,7 +16,9 @@
 
 package server
 
+import "report-service/internal/report_engine"
+
 type ReportRequest struct {
-	Id   string                 `json:"id,omitempty"`
-	Data map[string]interface{} `json:"data,omitempty"`
+	Id   string                                `json:"id,omitempty"`
+	Data map[string]report_engine.ReportObject `json:"data,omitempty"`
 }
