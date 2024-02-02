@@ -19,7 +19,7 @@ package report_engine
 import (
 	"fmt"
 	"report-service/internal/apis/senergy_db_v3"
-	"report-service/internal/server"
+	"report-service/internal/helper"
 )
 
 type Client struct {
@@ -28,7 +28,7 @@ type Client struct {
 }
 
 func NewClient(driver ReportingDriver) *Client {
-	dbClient := senergy_db_v3.NewClient(server.GetEnv("SENERGY_DB_URL", "http://localhost"), server.GetEnv("SENERGY_DB_PORT", "80"))
+	dbClient := senergy_db_v3.NewClient(helper.GetEnv("SENERGY_DB_URL", "http://localhost"), helper.GetEnv("SENERGY_DB_PORT", "80"))
 	return &Client{Driver: driver, DBClient: dbClient}
 }
 
