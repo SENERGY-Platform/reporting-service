@@ -27,6 +27,7 @@ type Client struct {
 	DBClient *senergy_db_v3.Client
 }
 
+// NewClient creates a new client with the given reporting driver.
 func NewClient(driver ReportingDriver) *Client {
 	dbClient := senergy_db_v3.NewClient(helper.GetEnv("SENERGY_DB_URL", "http://localhost"), helper.GetEnv("SENERGY_DB_PORT", "80"))
 	return &Client{Driver: driver, DBClient: dbClient}
@@ -49,32 +50,33 @@ func (r *Client) CreateReport(id string, data map[string]ReportObject, authToken
 	return
 }
 
-func (r *Client) setReportData(data map[string]ReportObject, authTokenString string) (resultData map[string]interface{}, err error) {
-	resultData = make(map[string]interface{})
+func (r *Client) setReportData(data map[string]ReportObject, authToken string) (resultData map[string]interface{}, err error) {
+	resultData = make(map[string]interface{}, len(data))
 	for key, value := range data {
-		if _, ok := resultData[key]; !ok {
-			resultData[key] = ""
-		}
 		switch value.ValueType {
 		case "string", "int", "float":
 			resultData[key] = value.Value
 		case "object":
-			resultData[key], err = r.setReportData(value.Fields, authTokenString)
+			resultData[key], err = r.setReportData(value.Fields, authToken)
+			if err != nil {
+				return
+			}
 		case "array":
 			if value.Value != nil {
 				resultData[key] = value.Value
-				break
 			} else if len(value.Children) > 0 {
-				resultData[key], err = r.setReportData(value.Children, authTokenString)
+				resultData[key], err = r.setReportData(value.Children, authToken)
+				if err != nil {
+					return
+				}
 			} else if value.Query != nil {
 				var responseData []interface{}
-				responseData, err = r.DBClient.Query(authTokenString, *value.Query)
+				responseData, err = r.DBClient.Query(authToken, *value.Query)
 				if err != nil {
 					return
 				}
 				resultData[key] = responseData
 			}
-		default:
 		}
 	}
 	return
