@@ -1,4 +1,3 @@
-version: '3.3'
 services:
   jsreport:
     image: jsreport/jsreport:4.2.0-full

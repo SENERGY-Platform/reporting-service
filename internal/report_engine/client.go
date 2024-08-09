@@ -33,28 +33,57 @@ func NewClient(driver ReportingDriver) *Client {
 	return &Client{Driver: driver, DBClient: dbClient}
 }
 
+// GetTemplates retrieves a list of available report templates.
+//
+// Returns a slice of Template objects and an error if the operation fails.
 func (r *Client) GetTemplates() (templates []Template, err error) {
 	templates, err = r.Driver.GetTemplates()
 	return
 }
 
+// GetTemplateById retrieves a template by its ID.
+//
+// Parameters:
+// - id: The ID of the template to retrieve.
+//
+// Returns:
+// - template: The retrieved template.
+// - err: An error if the retrieval fails.
 func (r *Client) GetTemplateById(id string) (template Template, err error) {
 	template, err = r.Driver.GetTemplateById(id)
 	return
 }
 
+// CreateReport creates a report with the given ID and data.
+//
+// Parameters:
+// - id: The ID of the report to create.
+// - data: A map of report objects.
+// - authTokenString: The authentication token string.
+//
+// Returns:
+// - err: An error if the operation fails.
 func (r *Client) CreateReport(id string, data map[string]ReportObject, authTokenString string) (err error) {
+	fmt.Println(id)
 	reportData, err := r.setReportData(data, authTokenString)
 	fmt.Println(fmt.Sprintf("%s", reportData))
 	err = r.Driver.CreateReport(id, reportData)
 	return
 }
 
+// setReportData recursively sets report data based on the input data and authorization token.
+//
+// Parameters:
+// - data: A map of ReportObject containing the report data.
+// - authToken: A string representing the authorization token.
+// Returns:
+// - resultData: A map of interface{} containing the processed report data.
+// - err: An error if the operation fails.
 func (r *Client) setReportData(data map[string]ReportObject, authToken string) (resultData map[string]interface{}, err error) {
 	resultData = make(map[string]interface{}, len(data))
 	for key, value := range data {
 		switch value.ValueType {
-		case "string", "int", "float":
+		case "string", "int", "float", "float64":
 			resultData[key] = value.Value
 		case "object":
 			resultData[key], err = r.setReportData(value.Fields, authToken)
