@@ -17,8 +17,8 @@
 package server
 
 import (
+	"report-service/internal/apis/jsreport"
 	"report-service/internal/helper"
-	"report-service/internal/report_apis/jsreport"
 	"report-service/internal/report_engine"
 )
 
@@ -26,5 +26,7 @@ func Start() {
 	client := report_engine.NewClient(jsreport.NewJSReportClient(
 		helper.GetEnv("JSREPORT_SERVER_URL", "http://localhost"),
 		helper.GetEnv("JSREPORT_SERVER_PORT", "5488")))
+	report_engine.InitDB()
+	defer report_engine.CloseDB()
 	startAPI(client)
 }

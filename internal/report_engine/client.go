@@ -18,8 +18,16 @@ package report_engine
 
 import (
 	"fmt"
+	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
+	"github.com/globalsign/mgo/bson"
+	"github.com/google/uuid"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"log"
 	"report-service/internal/apis/senergy_db_v3"
 	"report-service/internal/helper"
+	"strconv"
+	"strings"
 )
 
 type Client struct {
@@ -107,6 +115,80 @@ func (r *Client) setReportData(data map[string]ReportObject, authToken string) (
 				resultData[key] = responseData
 			}
 		}
+	}
+	return
+}
+
+// SaveReport saves a report to the MongoDB database.
+//
+// Parameters:
+// - templateId: A string representing the ID of the report template.
+// - data: A map of ReportObject containing the report data.
+// - authTokenString: A string representing the authorization token.
+//
+// Returns:
+// - err: An error if the operation fails.
+func (r *Client) SaveReport(templateId string, data map[string]ReportObject, authTokenString string) (err error) {
+	claims, err := jwt.Parse(authTokenString)
+	id := uuid.New()
+	_, err = Mongo().InsertOne(CTX,
+		Report{Id: id.String(), TemplateId: templateId, Data: data, UserId: claims.GetUserId()})
+	return
+}
+
+func (r *Client) GetReport(id string, authTokenString string) (report Report, err error) {
+	claims, err := jwt.Parse(authTokenString)
+	err = Mongo().FindOne(CTX, bson.M{"_id": id, "userid": claims.GetUserId()}).Decode(&report)
+	if err != nil {
+		log.Println(err)
+		return Report{}, err
+	}
+	return
+}
+
+func (r *Client) GetReports(authTokenString string, args map[string][]string, admin bool) (reports []Report, err error) {
+	claims, err := jwt.Parse(authTokenString)
+	opt := options.Find()
+	for arg, value := range args {
+		if arg == "limit" {
+			limit, _ := strconv.ParseInt(value[0], 10, 64)
+			opt.SetLimit(limit)
+		}
+		if arg == "offset" {
+			skip, _ := strconv.ParseInt(value[0], 10, 64)
+			opt.SetSkip(skip)
+		}
+		if arg == "order" {
+			ord := strings.Split(value[0], ":")
+			order := 1
+			if ord[1] == "desc" {
+				order = -1
+			}
+			opt.SetSort(bson.M{ord[0]: int64(order)})
+		}
+	}
+	var cur *mongo.Cursor
+	req := bson.M{"userid": claims.GetUserId()}
+	if val, ok := args["search"]; ok {
+		req = bson.M{"userid": claims.GetUserId(), "_id": bson.RegEx{Pattern: val[0], Options: "i"}}
+	}
+	if admin {
+		req = bson.M{}
+	}
+	cur, err = Mongo().Find(CTX, req, opt)
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	for cur.Next(CTX) {
+		// create a value into which the single document can be decoded
+		var elem Report
+		err := cur.Decode(&elem)
+		if err != nil {
+			log.Fatal(err)
+			return nil, err
+		}
+		reports = append(reports, elem)
 	}
 	return
 }

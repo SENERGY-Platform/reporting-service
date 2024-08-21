@@ -33,11 +33,13 @@ func startAPI(reportingClient *report_engine.Client) {
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 	}))
+
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "pong",
 		})
 	})
+
 	r.GET("/templates", func(c *gin.Context) {
 		templates, err := reportingClient.GetTemplates()
 		if err != nil {
@@ -47,6 +49,7 @@ func startAPI(reportingClient *report_engine.Client) {
 			"data": templates,
 		})
 	})
+
 	r.GET("/templates/:id", func(c *gin.Context) {
 		id := c.Param("id")
 		template, err := reportingClient.GetTemplateById(id)
@@ -57,7 +60,8 @@ func startAPI(reportingClient *report_engine.Client) {
 			"data": template,
 		})
 	})
-	r.POST("/report", func(c *gin.Context) {
+
+	r.POST("/report/create", func(c *gin.Context) {
 		var request ReportRequest
 		authString := c.GetHeader("Authorization")
 		if err := c.ShouldBindJSON(&request); err != nil {
@@ -71,6 +75,44 @@ func startAPI(reportingClient *report_engine.Client) {
 		}
 		c.Status(http.StatusOK)
 	})
+
+	r.POST("/report", func(c *gin.Context) {
+		var request ReportRequest
+		authString := c.GetHeader("Authorization")
+		if err := c.ShouldBindJSON(&request); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		err := reportingClient.SaveReport(request.Id, request.Data, authString)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.Status(http.StatusOK)
+	})
+
+	r.GET("/report", func(c *gin.Context) {
+		args := c.Request.URL.Query()
+		authString := c.GetHeader("Authorization")
+		reports, err := reportingClient.GetReports(authString, args, false)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, reports)
+	})
+
+	r.GET("/report/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		authString := c.GetHeader("Authorization")
+		report, err := reportingClient.GetReport(id, authString)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, report)
+	})
+
 	err := r.Run("127.0.0.1:8080")
 	if err == nil {
 		fmt.Printf("Starting api server failed: %s \n", err)

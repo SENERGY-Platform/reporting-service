@@ -45,3 +45,10 @@ type ReportObject struct {
 	Fields   map[string]ReportObject                `json:"fields,omitempty"`
 	Children map[string]ReportObject                `json:"children,omitempty"`
 }
+
+type Report struct {
+	Id         string                  `bson:"_id" json:"id,omitempty"`
+	Data       map[string]ReportObject `json:"data,omitempty"`
+	TemplateId string                  `json:"templateId,omitempty"`
+	UserId     string                  `json:"userId,omitempty"`
+}

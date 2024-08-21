@@ -6,3 +6,11 @@ services:
     restart: unless-stopped
     volumes:
       - "./docker/jsreport/data:/app/data/"
+  mongodb:
+    image: mongo:7.0.12
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongodata:/app/data/
+volumes:
+  mongodata:
