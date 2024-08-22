@@ -47,8 +47,9 @@ type ReportObject struct {
 }
 
 type Report struct {
-	Id         string                  `bson:"_id" json:"id,omitempty"`
-	Data       map[string]ReportObject `json:"data,omitempty"`
-	TemplateId string                  `json:"templateId,omitempty"`
-	UserId     string                  `json:"userId,omitempty"`
+	Id           string                  `bson:"_id" json:"id,omitempty"`
+	TemplateName string                  `json:"templateName,omitempty"`
+	Data         map[string]ReportObject `json:"data,omitempty"`
+	TemplateId   string                  `json:"templateId,omitempty"`
+	UserId       string                  `json:"userId,omitempty"`
 }

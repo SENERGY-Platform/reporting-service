@@ -17,7 +17,6 @@
 package report_engine
 
 import (
-	"fmt"
 	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
 	"github.com/globalsign/mgo/bson"
 	"github.com/google/uuid"
@@ -71,11 +70,9 @@ func (r *Client) GetTemplateById(id string) (template Template, err error) {
 //
 // Returns:
 // - err: An error if the operation fails.
-func (r *Client) CreateReport(id string, data map[string]ReportObject, authTokenString string) (err error) {
-	fmt.Println(id)
-	reportData, err := r.setReportData(data, authTokenString)
-	fmt.Println(fmt.Sprintf("%s", reportData))
-	err = r.Driver.CreateReport(id, reportData)
+func (r *Client) CreateReport(report Report, authTokenString string) (err error) {
+	reportData, err := r.setReportData(report.Data, authTokenString)
+	err = r.Driver.CreateReport(report.TemplateName, reportData)
 	return
 }
 
@@ -128,12 +125,29 @@ func (r *Client) setReportData(data map[string]ReportObject, authToken string) (
 //
 // Returns:
 // - err: An error if the operation fails.
-func (r *Client) SaveReport(templateId string, data map[string]ReportObject, authTokenString string) (err error) {
+func (r *Client) SaveReport(report Report, authTokenString string) (err error) {
 	claims, err := jwt.Parse(authTokenString)
-	id := uuid.New()
-	_, err = Mongo().InsertOne(CTX,
-		Report{Id: id.String(), TemplateId: templateId, Data: data, UserId: claims.GetUserId()})
+	report.Id = uuid.New().String()
+	report.UserId = claims.GetUserId()
+	_, err = Mongo().InsertOne(CTX, report)
 	return
+}
+
+func (r *Client) UpdateReport(report Report, authTokenString string) (err error) {
+	claims, err := jwt.Parse(authTokenString)
+	report.UserId = claims.GetUserId()
+	_, err = Mongo().ReplaceOne(CTX, bson.M{"_id": report.Id, "userid": claims.GetUserId()}, report)
+	return
+}
+
+func (r *Client) DeleteReport(id string, authTokenString string, admin bool) (err error) {
+	claims, err := jwt.Parse(authTokenString)
+	req := bson.M{"_id": id, "userid": claims.GetUserId()}
+	if admin {
+		req = bson.M{"_id": id}
+	}
+	res := Mongo().FindOneAndDelete(CTX, req)
+	return res.Err()
 }
 
 func (r *Client) GetReport(id string, authTokenString string) (report Report, err error) {

@@ -62,13 +62,13 @@ func startAPI(reportingClient *report_engine.Client) {
 	})
 
 	r.POST("/report/create", func(c *gin.Context) {
-		var request ReportRequest
+		var request report_engine.Report
 		authString := c.GetHeader("Authorization")
 		if err := c.ShouldBindJSON(&request); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		err := reportingClient.CreateReport(request.Id, request.Data, authString)
+		err := reportingClient.CreateReport(request, authString)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -77,13 +77,28 @@ func startAPI(reportingClient *report_engine.Client) {
 	})
 
 	r.POST("/report", func(c *gin.Context) {
-		var request ReportRequest
+		var request report_engine.Report
 		authString := c.GetHeader("Authorization")
 		if err := c.ShouldBindJSON(&request); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		err := reportingClient.SaveReport(request.Id, request.Data, authString)
+		err := reportingClient.SaveReport(request, authString)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.Status(http.StatusOK)
+	})
+
+	r.PUT("/report", func(c *gin.Context) {
+		var request report_engine.Report
+		authString := c.GetHeader("Authorization")
+		if err := c.ShouldBindJSON(&request); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		err := reportingClient.UpdateReport(request, authString)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -99,7 +114,20 @@ func startAPI(reportingClient *report_engine.Client) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, reports)
+		c.JSON(http.StatusOK, gin.H{
+			"data": reports,
+		})
+	})
+
+	r.DELETE("/report/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		authString := c.GetHeader("Authorization")
+		err := reportingClient.DeleteReport(id, authString, false)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.Status(http.StatusNoContent)
 	})
 
 	r.GET("/report/:id", func(c *gin.Context) {
@@ -110,7 +138,9 @@ func startAPI(reportingClient *report_engine.Client) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, report)
+		c.JSON(http.StatusOK, gin.H{
+			"data": report,
+		})
 	})
 
 	err := r.Run("127.0.0.1:8080")
