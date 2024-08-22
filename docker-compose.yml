@@ -1,11 +1,13 @@
 services:
   jsreport:
-    image: jsreport/jsreport:4.2.0-full
+    image: jsreport/jsreport:4.6.0-full
     ports:
       - "5488:5488"
     restart: unless-stopped
     volumes:
       - "./docker/jsreport/data:/app/data/"
+      - "./docker/jsreport/jsreport.config.json:/app/jsreport.config.json"
+
   mongodb:
     image: mongo:7.0.12
     ports:

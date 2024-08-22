@@ -40,8 +40,8 @@ func NewJSReportClient(url string, port string) *Client {
 	return &Client{Url: url, Port: port, BaseUrl: fmt.Sprintf("%v:%v", url, port), HttpClient: client}
 }
 
-func (j *Client) GetTemplates() (templates []report_engine.Template, err error) {
-	response, err := j.HttpClient.R().Get(j.BaseUrl + "/odata/templates?$select=name")
+func (j *Client) GetTemplates(authString string) (templates []report_engine.Template, err error) {
+	response, err := j.HttpClient.R().SetHeader("Authorization", authString).Get(j.BaseUrl + "/odata/templates?$select=name")
 	var resp TemplateResponse
 	err = json.Unmarshal(response.Body(), &resp)
 	for _, jsTemplate := range resp.Templates {
@@ -51,11 +51,11 @@ func (j *Client) GetTemplates() (templates []report_engine.Template, err error) 
 	return
 }
 
-func (j *Client) GetTemplateById(templateId string) (template report_engine.Template, err error) {
-	response, err := j.HttpClient.R().Get(j.BaseUrl + "/odata/templates('" + templateId + "')")
+func (j *Client) GetTemplateById(templateId string, authString string) (template report_engine.Template, err error) {
+	response, err := j.HttpClient.R().SetHeader("Authorization", authString).Get(j.BaseUrl + "/odata/templates('" + templateId + "')")
 	var resp Template
 	err = json.Unmarshal(response.Body(), &resp)
-	jsData, err := j.getTemplateDataByShortId(resp.Data.ShortId)
+	jsData, err := j.getTemplateDataByShortId(resp.Data.ShortId, authString)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -110,11 +110,12 @@ func getJsonKeysAndTypes(jsonData map[string]interface{}) (result map[string]rep
 	return
 }
 
-func (j *Client) CreateReport(id string, data map[string]interface{}) (err error) {
+func (j *Client) CreateReport(id string, data map[string]interface{}, authString string) (err error) {
 	response, err := j.HttpClient.R().
+		SetHeader("Authorization", authString).
 		SetBody(map[string]interface{}{
 			"template": map[string]interface{}{"name": id},
-			"options":  map[string]interface{}{"reports": map[string]interface{}{"save": true}},
+			"options":  map[string]interface{}{"reports": map[string]interface{}{"save": true}, "reportName": "tester"},
 			"data":     data}).
 		Post(j.BaseUrl + "/api/report")
 	if err != nil {
@@ -129,8 +130,8 @@ func (j *Client) CreateReport(id string, data map[string]interface{}) (err error
 	return
 }
 
-func (j *Client) getTemplateDataByShortId(id string) (data Data, err error) {
-	response, err := j.HttpClient.R().Get(j.BaseUrl + "/odata/data?$filter=" + url.QueryEscape("shortid eq '"+id+"'"))
+func (j *Client) getTemplateDataByShortId(id string, authString string) (data Data, err error) {
+	response, err := j.HttpClient.R().SetHeader("Authorization", authString).Get(j.BaseUrl + "/odata/data?$filter=" + url.QueryEscape("shortid eq '"+id+"'"))
 	var resp DataResponse
 	err = json.Unmarshal(response.Body(), &resp)
 	data = resp.Data[0]

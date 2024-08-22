@@ -43,8 +43,8 @@ func NewClient(driver ReportingDriver) *Client {
 // GetTemplates retrieves a list of available report templates.
 //
 // Returns a slice of Template objects and an error if the operation fails.
-func (r *Client) GetTemplates() (templates []Template, err error) {
-	templates, err = r.Driver.GetTemplates()
+func (r *Client) GetTemplates(authTokenString string) (templates []Template, err error) {
+	templates, err = r.Driver.GetTemplates(authTokenString)
 	return
 }
 
@@ -56,8 +56,8 @@ func (r *Client) GetTemplates() (templates []Template, err error) {
 // Returns:
 // - template: The retrieved template.
 // - err: An error if the retrieval fails.
-func (r *Client) GetTemplateById(id string) (template Template, err error) {
-	template, err = r.Driver.GetTemplateById(id)
+func (r *Client) GetTemplateById(id string, authString string) (template Template, err error) {
+	template, err = r.Driver.GetTemplateById(id, authString)
 	return
 }
 
@@ -72,7 +72,7 @@ func (r *Client) GetTemplateById(id string) (template Template, err error) {
 // - err: An error if the operation fails.
 func (r *Client) CreateReport(report Report, authTokenString string) (err error) {
 	reportData, err := r.setReportData(report.Data, authTokenString)
-	err = r.Driver.CreateReport(report.TemplateName, reportData)
+	err = r.Driver.CreateReport(report.TemplateName, reportData, authTokenString)
 	return
 }
 

@@ -41,7 +41,8 @@ func startAPI(reportingClient *report_engine.Client) {
 	})
 
 	r.GET("/templates", func(c *gin.Context) {
-		templates, err := reportingClient.GetTemplates()
+		authString := c.GetHeader("Authorization")
+		templates, err := reportingClient.GetTemplates(authString)
 		if err != nil {
 			return
 		}
@@ -52,7 +53,8 @@ func startAPI(reportingClient *report_engine.Client) {
 
 	r.GET("/templates/:id", func(c *gin.Context) {
 		id := c.Param("id")
-		template, err := reportingClient.GetTemplateById(id)
+		authString := c.GetHeader("Authorization")
+		template, err := reportingClient.GetTemplateById(id, authString)
 		if err != nil {
 			return
 		}

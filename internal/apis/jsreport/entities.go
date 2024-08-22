@@ -28,6 +28,15 @@ type Template struct {
 	Data    ShortId `json:"data,omitempty"`
 }
 
+type TemplateOptions struct {
+	Reports Reports `json:"reports,omitempty"`
+}
+
+type Reports struct {
+	Save       bool   `json:"save,omitempty"`
+	ReportName string `json:"reportName,omitempty"`
+}
+
 type DataResponse struct {
 	Context string `json:"@odata.context,omitempty"`
 	Data    []Data `json:"value,omitempty"`
