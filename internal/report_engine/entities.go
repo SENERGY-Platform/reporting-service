@@ -53,4 +53,11 @@ type Report struct {
 	Data         map[string]ReportObject `json:"data,omitempty"`
 	TemplateId   string                  `json:"templateId,omitempty"`
 	UserId       string                  `json:"userId,omitempty"`
+	ReportFiles  []ReportFile            `json:"reportFiles,omitempty"`
+}
+
+type ReportFile struct {
+	Id   string `json:"id,omitempty"`
+	Link string `json:"link,omitempty"`
+	Type string `json:"type,omitempty"`
 }

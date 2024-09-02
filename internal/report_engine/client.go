@@ -71,8 +71,18 @@ func (r *Client) GetTemplateById(id string, authString string) (template Templat
 // Returns:
 // - err: An error if the operation fails.
 func (r *Client) CreateReport(report Report, authTokenString string) (err error) {
+	dbReport, err := r.GetReport(report.Id, authTokenString)
+	if err != nil {
+		return
+	}
+	report.ReportFiles = dbReport.ReportFiles
 	reportData, err := r.setReportData(report.Data, authTokenString)
-	err = r.Driver.CreateReport(report.TemplateName, reportData, authTokenString)
+	reportFileId, reportFileType, reportFileLink, err := r.Driver.CreateReport(report.Name, report.TemplateName, reportData, authTokenString)
+	report.ReportFiles = append(report.ReportFiles, ReportFile{Id: reportFileId, Type: reportFileType, Link: reportFileLink})
+	err = r.UpdateReport(report, authTokenString)
+	if err != nil {
+		return err
+	}
 	return
 }
 
@@ -129,14 +139,14 @@ func (r *Client) SaveReport(report Report, authTokenString string) (err error) {
 	claims, err := jwt.Parse(authTokenString)
 	report.Id = uuid.New().String()
 	report.UserId = claims.GetUserId()
-	_, err = Mongo().InsertOne(CTX, report)
+	_, err = Reports().InsertOne(CTX, report)
 	return
 }
 
 func (r *Client) UpdateReport(report Report, authTokenString string) (err error) {
 	claims, err := jwt.Parse(authTokenString)
 	report.UserId = claims.GetUserId()
-	_, err = Mongo().ReplaceOne(CTX, bson.M{"_id": report.Id, "userid": claims.GetUserId()}, report)
+	_, err = Reports().ReplaceOne(CTX, bson.M{"_id": report.Id, "userid": claims.GetUserId()}, report, options.Replace().SetUpsert(true))
 	return
 }
 
@@ -146,13 +156,13 @@ func (r *Client) DeleteReport(id string, authTokenString string, admin bool) (er
 	if admin {
 		req = bson.M{"_id": id}
 	}
-	res := Mongo().FindOneAndDelete(CTX, req)
+	res := Reports().FindOneAndDelete(CTX, req)
 	return res.Err()
 }
 
 func (r *Client) GetReport(id string, authTokenString string) (report Report, err error) {
 	claims, err := jwt.Parse(authTokenString)
-	err = Mongo().FindOne(CTX, bson.M{"_id": id, "userid": claims.GetUserId()}).Decode(&report)
+	err = Reports().FindOne(CTX, bson.M{"_id": id, "userid": claims.GetUserId()}).Decode(&report)
 	if err != nil {
 		log.Println(err)
 		return Report{}, err
@@ -189,7 +199,7 @@ func (r *Client) GetReports(authTokenString string, args map[string][]string, ad
 	if admin {
 		req = bson.M{}
 	}
-	cur, err = Mongo().Find(CTX, req, opt)
+	cur, err = Reports().Find(CTX, req, opt)
 	if err != nil {
 		log.Println(err)
 		return nil, err

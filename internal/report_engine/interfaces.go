@@ -19,5 +19,5 @@ package report_engine
 type ReportingDriver interface {
 	GetTemplates(string) ([]Template, error)
 	GetTemplateById(string, string) (Template, error)
-	CreateReport(string, map[string]interface{}, string) error
+	CreateReport(string, string, map[string]interface{}, string) (string, string, string, error)
 }

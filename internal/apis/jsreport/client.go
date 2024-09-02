@@ -110,23 +110,37 @@ func getJsonKeysAndTypes(jsonData map[string]interface{}) (result map[string]rep
 	return
 }
 
-func (j *Client) CreateReport(id string, data map[string]interface{}, authString string) (err error) {
+func (j *Client) CreateReport(reportName string, templateName string, data map[string]interface{}, authString string) (reportId string, reportType string, reportLink string, err error) {
+	if reportName == "" {
+		reportName = "report"
+	}
 	response, err := j.HttpClient.R().
 		SetHeader("Authorization", authString).
 		SetBody(map[string]interface{}{
-			"template": map[string]interface{}{"name": id},
-			"options":  map[string]interface{}{"reports": map[string]interface{}{"save": true}, "reportName": "tester"},
-			"data":     data}).
+			"template": map[string]interface{}{"name": templateName},
+			"options": map[string]interface{}{
+				"reports":    map[string]interface{}{"save": true, "async": false},
+				"reportName": reportName,
+			},
+			"data": data}).
 		Post(j.BaseUrl + "/api/report")
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
+	fmt.Println(response.StatusCode())
 	if response.StatusCode() != http.StatusOK {
+		if response.StatusCode() == http.StatusUnauthorized {
+			return "", "", "", errors.New("jsreport-unauthorized")
+		}
 		var errorResponse ErrorResponse
 		err = json.Unmarshal(response.Body(), &errorResponse)
-		return errors.New(errorResponse.Message)
+		return "", "", "", errors.New(errorResponse.Message)
 	}
+	fmt.Println(response.Header())
+	reportLink = response.Header().Get("Permanent-Link")
+	reportType = response.Header().Get("Content-Type")
+	reportId = response.Header().Get("Report-Id")
 	return
 }
 

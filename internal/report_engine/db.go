@@ -23,7 +23,7 @@ func InitDB() {
 	DB = client
 }
 
-func Mongo() *mongo.Collection {
+func Reports() *mongo.Collection {
 	return DB.Database("reporting").Collection("reports")
 }
 
@@ -32,8 +32,4 @@ func CloseDB() {
 	if err != nil {
 		panic("failed to disconnect database: " + err.Error())
 	}
-}
-
-func GetDB() *mongo.Client {
-	return DB
 }
