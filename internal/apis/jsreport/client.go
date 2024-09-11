@@ -110,6 +110,19 @@ func getJsonKeysAndTypes(jsonData map[string]interface{}) (result map[string]rep
 	return
 }
 
+// CreateReport creates a report with the given name, template name, and data.
+//
+// Parameters:
+// - reportName: The name of the report to create. If empty, defaults to "report".
+// - templateName: The name of the template to use.
+// - data: A map of report data.
+// - authString: The authentication token string.
+//
+// Returns:
+// - reportId: The ID of the created report.
+// - reportType: The type of the created report.
+// - reportLink: The permanent link of the created report.
+// - err: An error if the creation fails.
 func (j *Client) CreateReport(reportName string, templateName string, data map[string]interface{}, authString string) (reportId string, reportType string, reportLink string, err error) {
 	if reportName == "" {
 		reportName = "report"
@@ -142,6 +155,26 @@ func (j *Client) CreateReport(reportName string, templateName string, data map[s
 	reportType = response.Header().Get("Content-Type")
 	reportId = response.Header().Get("Report-Id")
 	return
+}
+
+// GetReportContent retrieves the content of the report with the given ID.
+//
+// Parameters:
+// - reportId: The ID of the report to retrieve.
+// - authString: The authentication token string.
+//
+// Returns:
+// - data: The content of the report.
+// - headerContentType: The content type of the report.
+// - err: An error if the retrieval fails.
+func (j *Client) GetReportContent(reportId string, authString string) (data []byte, headerContentType string, err error) {
+	response, err := j.HttpClient.R().
+		SetHeader("Authorization", authString).
+		Get(j.BaseUrl + "/reports/" + reportId + "/content")
+	if err != nil {
+		return
+	}
+	return response.Body(), response.Header().Get("Content-Type"), err
 }
 
 func (j *Client) getTemplateDataByShortId(id string, authString string) (data Data, err error) {

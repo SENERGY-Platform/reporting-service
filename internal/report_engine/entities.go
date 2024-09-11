@@ -58,6 +58,6 @@ type Report struct {
 
 type ReportFile struct {
 	Id   string `json:"id,omitempty"`
-	Link string `json:"link,omitempty"`
+	Link string `json:"-"`
 	Type string `json:"type,omitempty"`
 }

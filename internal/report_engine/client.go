@@ -126,6 +126,29 @@ func (r *Client) setReportData(data map[string]ReportObject, authToken string) (
 	return
 }
 
+// DownloadReportFile downloads a report file with the given file ID from the given report.
+//
+// Parameters:
+// - reportId: The ID of the report to download the file from.
+// - fileId: The ID of the file to download.
+// - authTokenString: The authentication token string.
+//
+// Returns:
+// - content: The content of the file.
+// - contentType: The content type of the file.
+// - err: An error if the operation fails.
+func (r *Client) DownloadReportFile(reportId string, fileId string, authTokenString string) (content []byte, contentType string, err error) {
+	_, err = r.GetReport(reportId, authTokenString)
+	if err != nil {
+		return
+	}
+	content, contentType, err = r.Driver.GetReportContent(fileId, authTokenString)
+	if err != nil {
+		return
+	}
+	return content, contentType, err
+}
+
 // SaveReport saves a report to the MongoDB database.
 //
 // Parameters:

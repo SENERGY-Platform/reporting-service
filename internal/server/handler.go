@@ -145,6 +145,18 @@ func startAPI(reportingClient *report_engine.Client) {
 		})
 	})
 
+	r.GET("/report/file/:reportId/:fileId", func(c *gin.Context) {
+		reportId := c.Param("reportId")
+		fileId := c.Param("fileId")
+		authString := c.GetHeader("Authorization")
+		content, contentType, err := reportingClient.DownloadReportFile(reportId, fileId, authString)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.Data(http.StatusOK, contentType, content)
+	})
+
 	err := r.Run("127.0.0.1:8080")
 	if err == nil {
 		fmt.Printf("Starting api server failed: %s \n", err)

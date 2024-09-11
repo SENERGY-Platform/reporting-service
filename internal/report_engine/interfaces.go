@@ -19,5 +19,29 @@ package report_engine
 type ReportingDriver interface {
 	GetTemplates(string) ([]Template, error)
 	GetTemplateById(string, string) (Template, error)
-	CreateReport(string, string, map[string]interface{}, string) (string, string, string, error)
+	// CreateReport creates a report with the given ID and data.
+	//
+	// Parameters:
+	// - reportName: The name of the report to create.
+	// - templateName: The name of the template to use for the report.
+	// - data: A map of report objects, which will be used to fill the report template.
+	// - authString: The authentication token string.
+	//
+	// Returns:
+	// - reportId: The ID of the created report.
+	// - reportType: The type of the created report.
+	// - reportLink: A link to the created report.
+	// - err: An error if the operation fails.
+	CreateReport(reportName string, templateName string, data map[string]interface{}, authString string) (reportId string, reportType string, reportLink string, err error)
+	// GetReportContent retrieves the content of the report with the given ID.
+	//
+	// Parameters:
+	// - reportId: The ID of the report to retrieve.
+	// - authString: The authentication token string.
+	//
+	// Returns:
+	// - data: The content of the report.
+	// - headerContentType: The content type of the report.
+	// - err: An error if the retrieval fails.
+	GetReportContent(reportId string, authString string) (data []byte, headerContentType string, err error)
 }
