@@ -6,7 +6,7 @@ toolchain go1.22.0
 
 require (
 	github.com/SENERGY-Platform/service-commons v0.0.0-20240813072046-91b3195dd8fc
-	github.com/SENERGY-Platform/timescale-wrapper v0.0.16
+	github.com/SENERGY-Platform/timescale-wrapper v0.0.17
 	github.com/gin-contrib/cors v1.5.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/globalsign/mgo v0.0.0-20181015135952-eeefdecb41b8

@@ -50,9 +50,13 @@ func (s *Client) Query(authTokenString string, query timescaleModels.QueriesRequ
 	}
 	if response.StatusCode() != http.StatusOK {
 		err = fmt.Errorf("%v", response.String())
+		return
 	}
 	var resp [][][]interface{}
 	err = json.Unmarshal(response.Body(), &resp)
+	if err != nil {
+		return
+	}
 	for _, value := range resp[0] {
 		data = append(data, value[1])
 	}

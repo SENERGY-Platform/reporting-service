@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"log"
 	"net/http"
 	"report-service/internal/report_engine"
 )
@@ -72,6 +73,7 @@ func startAPI(reportingClient *report_engine.Client) {
 		}
 		err := reportingClient.CreateReport(request, authString)
 		if err != nil {
+			log.Println(err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}

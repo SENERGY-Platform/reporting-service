@@ -78,6 +78,9 @@ func (r *Client) CreateReport(report Report, authTokenString string) (err error)
 	}
 	report.ReportFiles = dbReport.ReportFiles
 	reportData, err := r.setReportData(report.Data, authTokenString)
+	if err != nil {
+		return
+	}
 	reportFileId, reportFileType, reportFileLink, err := r.Driver.CreateReport(report.Name, report.TemplateName, reportData, authTokenString)
 	report.ReportFiles = append(report.ReportFiles, ReportFile{Id: reportFileId, Type: reportFileType, Link: reportFileLink})
 	err = r.UpdateReport(report, authTokenString)
