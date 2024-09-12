@@ -142,7 +142,6 @@ func (j *Client) CreateReport(reportName string, templateName string, data map[s
 		fmt.Println(err.Error())
 		return
 	}
-	fmt.Println(response.StatusCode())
 	if response.StatusCode() != http.StatusOK {
 		if response.StatusCode() == http.StatusUnauthorized {
 			return "", "", "", errors.New("jsreport-unauthorized")
@@ -151,7 +150,6 @@ func (j *Client) CreateReport(reportName string, templateName string, data map[s
 		err = json.Unmarshal(response.Body(), &errorResponse)
 		return "", "", "", errors.New(errorResponse.Error.Message)
 	}
-	fmt.Println(response.Header())
 	reportLink = response.Header().Get("Permanent-Link")
 	reportType = response.Header().Get("Content-Type")
 	reportId = response.Header().Get("Report-Id")
