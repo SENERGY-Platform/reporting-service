@@ -53,6 +53,11 @@ type ShortId struct {
 }
 
 type ErrorResponse struct {
+	Error ErrorResponseDetails `json:"error,omitempty"`
+}
+
+type ErrorResponseDetails struct {
+	Code    int    `json:"code,omitempty"`
 	Message string `json:"message,omitempty"`
 	Stack   string `json:"stack,omitempty"`
 }

@@ -157,6 +157,18 @@ func startAPI(reportingClient *report_engine.Client) {
 		c.Data(http.StatusOK, contentType, content)
 	})
 
+	r.DELETE("/report/file/:reportId/:fileId", func(c *gin.Context) {
+		reportId := c.Param("reportId")
+		fileId := c.Param("fileId")
+		authString := c.GetHeader("Authorization")
+		err := reportingClient.DeleteCreatedReportFile(reportId, fileId, authString)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.Status(http.StatusNoContent)
+	})
+
 	err := r.Run("127.0.0.1:8080")
 	if err == nil {
 		fmt.Printf("Starting api server failed: %s \n", err)

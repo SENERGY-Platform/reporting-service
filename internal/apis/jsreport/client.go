@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -148,7 +149,7 @@ func (j *Client) CreateReport(reportName string, templateName string, data map[s
 		}
 		var errorResponse ErrorResponse
 		err = json.Unmarshal(response.Body(), &errorResponse)
-		return "", "", "", errors.New(errorResponse.Message)
+		return "", "", "", errors.New(errorResponse.Error.Message)
 	}
 	fmt.Println(response.Header())
 	reportLink = response.Header().Get("Permanent-Link")
@@ -177,10 +178,33 @@ func (j *Client) GetReportContent(reportId string, authString string) (data []by
 	return response.Body(), response.Header().Get("Content-Type"), err
 }
 
+func (j *Client) DeleteCreatedReportFile(reportId string, authString string) (err error) {
+	response, err := j.HttpClient.R().
+		SetHeader("Authorization", authString).
+		Delete(j.BaseUrl + "/odata/reports('" + reportId + "')")
+	if err != nil {
+		log.Println(err.Error())
+		return
+	}
+	if response.StatusCode() != http.StatusNoContent {
+		var errorResponse ErrorResponse
+		_ = json.Unmarshal(response.Body(), &errorResponse)
+		if errorResponse.Error.Message == reportNotFoundErrorMessage(reportId) {
+			return
+		}
+		err = errors.New(errorResponse.Error.Message)
+	}
+	return
+}
+
 func (j *Client) getTemplateDataByShortId(id string, authString string) (data Data, err error) {
 	response, err := j.HttpClient.R().SetHeader("Authorization", authString).Get(j.BaseUrl + "/odata/data?$filter=" + url.QueryEscape("shortid eq '"+id+"'"))
 	var resp DataResponse
 	err = json.Unmarshal(response.Body(), &resp)
 	data = resp.Data[0]
 	return
+}
+
+func reportNotFoundErrorMessage(reportId string) string {
+	return fmt.Sprintf("Report %s not found", reportId)
 }

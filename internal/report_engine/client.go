@@ -17,6 +17,7 @@
 package report_engine
 
 import (
+	"fmt"
 	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
 	"github.com/globalsign/mgo/bson"
 	"github.com/google/uuid"
@@ -147,6 +148,30 @@ func (r *Client) DownloadReportFile(reportId string, fileId string, authTokenStr
 		return
 	}
 	return content, contentType, err
+}
+
+func (r *Client) DeleteCreatedReportFile(reportId string, fileId string, authTokenString string) (err error) {
+	report, err := r.GetReport(reportId, authTokenString)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	err = r.Driver.DeleteCreatedReportFile(fileId, authTokenString)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	for index, element := range report.ReportFiles {
+		if element.Id == fileId {
+			report.ReportFiles = append(report.ReportFiles[:index], report.ReportFiles[index+1:]...)
+		}
+	}
+	err = r.UpdateReport(report, authTokenString)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	return
 }
 
 // SaveReport saves a report to the MongoDB database.
