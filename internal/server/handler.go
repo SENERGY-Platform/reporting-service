@@ -26,6 +26,7 @@ import (
 )
 
 func startAPI(reportingClient *report_engine.Client) {
+	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},

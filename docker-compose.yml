@@ -7,7 +7,6 @@ services:
     volumes:
       - "./docker/jsreport/data:/app/data/"
       - "./docker/jsreport/jsreport.config.json:/app/jsreport.config.json"
-
   mongodb:
     image: mongo:7.0.12
     ports:
