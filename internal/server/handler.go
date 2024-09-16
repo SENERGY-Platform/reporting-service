@@ -22,11 +22,20 @@ import (
 	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
+	"report-service/internal/helper"
 	"report-service/internal/report_engine"
+	"strconv"
 )
 
 func startAPI(reportingClient *report_engine.Client) {
-	gin.SetMode(gin.ReleaseMode)
+
+	DEBUG, err := strconv.ParseBool(helper.GetEnv("DEBUG", "false"))
+	if err != nil {
+		log.Print("Error loading debug value")
+	}
+	if !DEBUG {
+		gin.SetMode(gin.ReleaseMode)
+	}
 	r := gin.Default()
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
@@ -172,7 +181,11 @@ func startAPI(reportingClient *report_engine.Client) {
 		c.Status(http.StatusNoContent)
 	})
 
-	err := r.Run("127.0.0.1:8080")
+	if !DEBUG {
+		err = r.Run()
+	} else {
+		err = r.Run("127.0.0.1:8080")
+	}
 	if err == nil {
 		fmt.Printf("Starting api server failed: %s \n", err)
 	}
