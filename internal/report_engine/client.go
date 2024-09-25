@@ -18,16 +18,17 @@ package report_engine
 
 import (
 	"fmt"
-	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
-	"github.com/globalsign/mgo/bson"
-	"github.com/google/uuid"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
 	"report-service/internal/apis/senergy_db_v3"
 	"report-service/internal/helper"
 	"strconv"
 	"strings"
+
+	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
+	"github.com/globalsign/mgo/bson"
+	"github.com/google/uuid"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type Client struct {
@@ -36,8 +37,17 @@ type Client struct {
 }
 
 // NewClient creates a new client with the given reporting driver.
+//
+// Parameters:
+// - driver: The reporting driver to use.
+//
+// Returns:
+// - client: The newly created client.
 func NewClient(driver ReportingDriver) *Client {
-	dbClient := senergy_db_v3.NewClient(helper.GetEnv("SENERGY_DB_URL", "http://localhost"), helper.GetEnv("SENERGY_DB_PORT", "80"))
+	dbClient := senergy_db_v3.NewClient(
+		helper.GetEnv("SENERGY_DB_URL", "http://localhost"),
+		helper.GetEnv("SENERGY_DB_PORT", "80"),
+	)
 	return &Client{Driver: driver, DBClient: dbClient}
 }
 
@@ -153,6 +163,15 @@ func (r *Client) DownloadReportFile(reportId string, fileId string, authTokenStr
 	return content, contentType, err
 }
 
+// DeleteCreatedReportFile deletes a report file with the given file ID from the given report.
+//
+// Parameters:
+// - reportId: The ID of the report to delete the file from.
+// - fileId: The ID of the file to delete.
+// - authTokenString: The authentication token string.
+//
+// Returns:
+// - err: An error if the operation fails.
 func (r *Client) DeleteCreatedReportFile(reportId string, fileId string, authTokenString string) (err error) {
 	report, err := r.GetReport(reportId, authTokenString)
 	if err != nil {

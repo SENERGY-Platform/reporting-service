@@ -23,3 +23,5 @@ go.work
 .idea
 docker/
 .env
+.vscode
+__debug*
