@@ -92,6 +92,9 @@ func (r *Client) CreateReport(report Report, authTokenString string) (err error)
 		return
 	}
 	reportFileId, reportFileType, reportFileLink, err := r.Driver.CreateReport(report.Name, report.TemplateName, reportData, authTokenString)
+	if err != nil {
+		return
+	}
 	report.ReportFiles = append(report.ReportFiles, ReportFile{Id: reportFileId, Type: reportFileType, Link: reportFileLink})
 	err = r.UpdateReport(report, authTokenString)
 	if err != nil {
@@ -207,21 +210,45 @@ func (r *Client) DeleteCreatedReportFile(reportId string, fileId string, authTok
 // - err: An error if the operation fails.
 func (r *Client) SaveReport(report Report, authTokenString string) (err error) {
 	claims, err := jwt.Parse(authTokenString)
+	if err != nil {
+		return
+	}
 	report.Id = uuid.New().String()
 	report.UserId = claims.GetUserId()
 	_, err = Reports().InsertOne(CTX, report)
 	return
 }
 
+// UpdateReport updates a report in the MongoDB database.
+//
+// Parameters:
+// - report: A Report representing the report to update.
+// - authTokenString: A string representing the authorization token.
+//
+// Returns:
+// - err: An error if the operation fails.
 func (r *Client) UpdateReport(report Report, authTokenString string) (err error) {
 	claims, err := jwt.Parse(authTokenString)
+	if err != nil {
+		return
+	}
 	report.UserId = claims.GetUserId()
+	if len(report.ReportFiles) == 0 || report.ReportFiles == nil {
+		oldReport, e := r.GetReport(report.Id, authTokenString)
+		if e != nil {
+			return
+		}
+		report.ReportFiles = oldReport.ReportFiles
+	}
 	_, err = Reports().ReplaceOne(CTX, bson.M{"_id": report.Id, "userid": claims.GetUserId()}, report, options.Replace().SetUpsert(true))
 	return
 }
 
 func (r *Client) DeleteReport(id string, authTokenString string, admin bool) (err error) {
 	claims, err := jwt.Parse(authTokenString)
+	if err != nil {
+		return
+	}
 	req := bson.M{"_id": id, "userid": claims.GetUserId()}
 	if admin {
 		req = bson.M{"_id": id}
@@ -232,6 +259,9 @@ func (r *Client) DeleteReport(id string, authTokenString string, admin bool) (er
 
 func (r *Client) GetReport(id string, authTokenString string) (report Report, err error) {
 	claims, err := jwt.Parse(authTokenString)
+	if err != nil {
+		return
+	}
 	err = Reports().FindOne(CTX, bson.M{"_id": id, "userid": claims.GetUserId()}).Decode(&report)
 	if err != nil {
 		log.Println(err)
@@ -242,6 +272,9 @@ func (r *Client) GetReport(id string, authTokenString string) (report Report, er
 
 func (r *Client) GetReports(authTokenString string, args map[string][]string, admin bool) (reports []Report, err error) {
 	claims, err := jwt.Parse(authTokenString)
+	if err != nil {
+		return
+	}
 	opt := options.Find()
 	for arg, value := range args {
 		if arg == "limit" {

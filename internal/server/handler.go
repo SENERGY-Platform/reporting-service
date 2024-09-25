@@ -18,20 +18,21 @@ package server
 
 import (
 	"fmt"
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
 	"report-service/internal/helper"
 	"report-service/internal/report_engine"
 	"strconv"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 )
 
 func startAPI(reportingClient *report_engine.Client) {
-
 	DEBUG, err := strconv.ParseBool(helper.GetEnv("DEBUG", "false"))
 	if err != nil {
 		log.Print("Error loading debug value")
+		DEBUG = false
 	}
 	if !DEBUG {
 		gin.SetMode(gin.ReleaseMode)
