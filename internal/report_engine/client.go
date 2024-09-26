@@ -261,7 +261,7 @@ func (r *Client) UpdateReport(report Report, authTokenString string) (err error)
 	return
 }
 
-// DeleteReport deletes a report by its ID.
+// DeleteReport deletes a report and created files by its ID.
 //
 // Parameters:
 // - id: The ID of the report to delete.
@@ -278,6 +278,16 @@ func (r *Client) DeleteReport(id string, authTokenString string, admin bool) (er
 	req := bson.M{"_id": id, "userid": claims.GetUserId()}
 	if admin {
 		req = bson.M{"_id": id}
+	}
+	report, err := r.GetReport(id, authTokenString)
+	if err != nil {
+		return
+	}
+	for _, element := range report.ReportFiles {
+		err = r.Driver.DeleteCreatedReportFile(element.Id, authTokenString)
+		if err != nil {
+			return
+		}
 	}
 	res := Reports().FindOneAndDelete(CTX, req)
 	return res.Err()

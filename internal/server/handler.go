@@ -142,6 +142,7 @@ func startAPI(reportingClient *report_engine.Client) {
 		authString := c.GetHeader("Authorization")
 		err := reportingClient.DeleteReport(id, authString, false)
 		if err != nil {
+			log.Println(err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
