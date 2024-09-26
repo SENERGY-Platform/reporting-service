@@ -116,7 +116,18 @@ func (r *Client) setReportData(data map[string]ReportObject, authToken string) (
 	for key, value := range data {
 		switch value.ValueType {
 		case "string", "int", "float", "float64":
-			resultData[key] = value.Value
+			if value.Value != nil {
+				resultData[key] = value.Value
+			} else if value.Query != nil {
+				var responseData []interface{}
+				responseData, err = r.DBClient.Query(authToken, *value.Query)
+				if err != nil {
+					return
+				}
+				if len(responseData) > 0 {
+					resultData[key] = responseData[0]
+				}
+			}
 		case "object":
 			resultData[key], err = r.setReportData(value.Fields, authToken)
 			if err != nil {
