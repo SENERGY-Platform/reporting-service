@@ -255,6 +255,15 @@ func (r *Client) UpdateReport(report Report, authTokenString string) (err error)
 	return
 }
 
+// DeleteReport deletes a report by its ID.
+//
+// Parameters:
+// - id: The ID of the report to delete.
+// - authTokenString: The authentication token string.
+// - admin: A boolean indicating whether the deletion is performed by an admin.
+//
+// Returns:
+// - err: An error if the operation fails.
 func (r *Client) DeleteReport(id string, authTokenString string, admin bool) (err error) {
 	claims, err := jwt.Parse(authTokenString)
 	if err != nil {
@@ -268,6 +277,15 @@ func (r *Client) DeleteReport(id string, authTokenString string, admin bool) (er
 	return res.Err()
 }
 
+// GetReport retrieves a report from the MongoDB database based on the provided ID and authentication token.
+//
+// Parameters:
+// - id: A string representing the ID of the report to retrieve.
+// - authTokenString: A string representing the authentication token.
+//
+// Returns:
+// - report: A Report struct representing the retrieved report.
+// - err: An error if the operation fails.
 func (r *Client) GetReport(id string, authTokenString string) (report Report, err error) {
 	claims, err := jwt.Parse(authTokenString)
 	if err != nil {
@@ -281,6 +299,16 @@ func (r *Client) GetReport(id string, authTokenString string) (report Report, er
 	return
 }
 
+// GetReports retrieves a list of reports from the MongoDB database based on the provided authentication token and query arguments.
+//
+// Parameters:
+// - authTokenString: A string representing the authentication token.
+// - args: A map of query arguments, including limit, offset, order, and search.
+// - admin: A boolean indicating whether the retrieval is performed by an admin.
+//
+// Returns:
+// - reports: A slice of Report structs representing the retrieved reports.
+// - err: An error if the operation fails.
 func (r *Client) GetReports(authTokenString string, args map[string][]string, admin bool) (reports []Report, err error) {
 	claims, err := jwt.Parse(authTokenString)
 	if err != nil {
