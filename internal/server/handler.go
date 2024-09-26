@@ -56,6 +56,7 @@ func startAPI(reportingClient *report_engine.Client) {
 		authString := c.GetHeader("Authorization")
 		templates, err := reportingClient.GetTemplates(authString)
 		if err != nil {
+			log.Println(err)
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{
@@ -68,6 +69,7 @@ func startAPI(reportingClient *report_engine.Client) {
 		authString := c.GetHeader("Authorization")
 		template, err := reportingClient.GetTemplateById(id, authString)
 		if err != nil {
+			log.Println(err)
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{
@@ -102,6 +104,7 @@ func startAPI(reportingClient *report_engine.Client) {
 		}
 		_, err := reportingClient.SaveReport(request, authString)
 		if err != nil {
+			log.Println(err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -117,6 +120,7 @@ func startAPI(reportingClient *report_engine.Client) {
 		}
 		err := reportingClient.UpdateReport(request, authString)
 		if err != nil {
+			log.Println(err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -169,6 +173,7 @@ func startAPI(reportingClient *report_engine.Client) {
 		authString := c.GetHeader("Authorization")
 		content, contentType, err := reportingClient.DownloadReportFile(reportId, fileId, authString)
 		if err != nil {
+			log.Println(err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -181,6 +186,7 @@ func startAPI(reportingClient *report_engine.Client) {
 		authString := c.GetHeader("Authorization")
 		err := reportingClient.DeleteCreatedReportFile(reportId, fileId, authString)
 		if err != nil {
+			log.Println(err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
