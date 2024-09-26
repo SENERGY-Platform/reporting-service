@@ -17,6 +17,7 @@
 package report_engine
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"report-service/internal/apis/senergy_db_v3"
@@ -81,9 +82,12 @@ func (r *Client) GetTemplateById(id string, authString string) (template Templat
 //
 // Returns:
 // - err: An error if the operation fails.
-func (r *Client) CreateReport(report Report, authTokenString string) (err error) {
+func (r *Client) CreateReport(report Report, authTokenString string) (resultReport Report, err error) {
 	dbReport, err := r.GetReport(report.Id, authTokenString)
-	if err != nil {
+	if errors.Is(err, mongo.ErrNoDocuments) || dbReport.Id == "" {
+		dbReport, _ = r.SaveReport(report, authTokenString)
+		report = dbReport
+	} else if err != nil {
 		return
 	}
 	report.ReportFiles = dbReport.ReportFiles
@@ -98,8 +102,9 @@ func (r *Client) CreateReport(report Report, authTokenString string) (err error)
 	report.ReportFiles = append(report.ReportFiles, ReportFile{Id: reportFileId, Type: reportFileType, Link: reportFileLink})
 	err = r.UpdateReport(report, authTokenString)
 	if err != nil {
-		return err
+		return
 	}
+	resultReport = report
 	return
 }
 
@@ -219,7 +224,7 @@ func (r *Client) DeleteCreatedReportFile(reportId string, fileId string, authTok
 //
 // Returns:
 // - err: An error if the operation fails.
-func (r *Client) SaveReport(report Report, authTokenString string) (err error) {
+func (r *Client) SaveReport(report Report, authTokenString string) (savedReport Report, err error) {
 	claims, err := jwt.Parse(authTokenString)
 	if err != nil {
 		return
@@ -227,6 +232,7 @@ func (r *Client) SaveReport(report Report, authTokenString string) (err error) {
 	report.Id = uuid.New().String()
 	report.UserId = claims.GetUserId()
 	_, err = Reports().InsertOne(CTX, report)
+	savedReport = report
 	return
 }
 
@@ -293,7 +299,6 @@ func (r *Client) GetReport(id string, authTokenString string) (report Report, er
 	}
 	err = Reports().FindOne(CTX, bson.M{"_id": id, "userid": claims.GetUserId()}).Decode(&report)
 	if err != nil {
-		log.Println(err)
 		return Report{}, err
 	}
 	return
