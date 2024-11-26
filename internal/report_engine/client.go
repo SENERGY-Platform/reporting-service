@@ -73,7 +73,7 @@ func (r *Client) GetTemplateById(id string, authString string) (template Templat
 	return
 }
 
-// CreateReport creates a report with the given ID and data.
+// CreateReportFile creates a report file with the given ID and data.
 //
 // Parameters:
 // - id: The ID of the report to create.
@@ -82,33 +82,41 @@ func (r *Client) GetTemplateById(id string, authString string) (template Templat
 //
 // Returns:
 // - err: An error if the operation fails.
-func (r *Client) CreateReport(report Report, authTokenString string) (resultReport Report, err error) {
-	dbReport, err := r.GetReport(report.Id, authTokenString)
-	if errors.Is(err, mongo.ErrNoDocuments) || dbReport.Id == "" {
-		dbReport, _ = r.SaveReport(report, authTokenString)
-		report = dbReport
+func (r *Client) CreateReportFile(reportRequest Report, authTokenString string) (resultReport Report, err error) {
+	reportModel, err := r.GetReportModel(reportRequest.Id, authTokenString)
+	// if no report model is found, create a new one
+	if errors.Is(err, mongo.ErrNoDocuments) || reportModel.Id == "" {
+		reportModel, _ = r.SaveReportModel(reportRequest, authTokenString)
+		reportRequest = reportModel
 	} else if err != nil {
 		return
 	}
-	report.ReportFiles = dbReport.ReportFiles
-	reportData, err := r.setReportData(report.Data, authTokenString)
+	reportRequest.ReportFiles = reportModel.ReportFiles
+
+	// set report file data
+	reportData, err := r.setReportFileData(reportRequest.Data, authTokenString)
 	if err != nil {
 		return
 	}
-	reportFileId, reportFileType, reportFileLink, err := r.Driver.CreateReport(report.Name, report.TemplateName, reportData, authTokenString)
+
+	// create the actual report file using the underlying driver
+	reportFileId, reportFileType, reportFileLink, err := r.Driver.CreateReport(reportRequest.Name, reportRequest.TemplateName, reportData, authTokenString)
 	if err != nil {
 		return
 	}
-	report.ReportFiles = append(report.ReportFiles, ReportFile{Id: reportFileId, Type: reportFileType, Link: reportFileLink})
-	err = r.UpdateReport(report, authTokenString)
+
+	// add the report file model to the report model
+	reportRequest.ReportFiles = append(reportRequest.ReportFiles, ReportFile{Id: reportFileId, Type: reportFileType, Link: reportFileLink})
+	err = r.UpdateReportModel(reportRequest, authTokenString)
 	if err != nil {
 		return
 	}
-	resultReport = report
+
+	resultReport = reportRequest
 	return
 }
 
-// setReportData recursively sets report data based on the input data and authorization token.
+// setReportFileData recursively sets report data based on the input data and authorization token.
 //
 // Parameters:
 // - data: A map of ReportObject containing the report data.
@@ -116,7 +124,7 @@ func (r *Client) CreateReport(report Report, authTokenString string) (resultRepo
 // Returns:
 // - resultData: A map of interface{} containing the processed report data.
 // - err: An error if the operation fails.
-func (r *Client) setReportData(data map[string]ReportObject, authToken string) (resultData map[string]interface{}, err error) {
+func (r *Client) setReportFileData(data map[string]ReportObject, authToken string) (resultData map[string]interface{}, err error) {
 	resultData = make(map[string]interface{}, len(data))
 	for key, value := range data {
 		switch value.ValueType {
@@ -134,7 +142,7 @@ func (r *Client) setReportData(data map[string]ReportObject, authToken string) (
 				}
 			}
 		case "object":
-			resultData[key], err = r.setReportData(value.Fields, authToken)
+			resultData[key], err = r.setReportFileData(value.Fields, authToken)
 			if err != nil {
 				return
 			}
@@ -142,7 +150,7 @@ func (r *Client) setReportData(data map[string]ReportObject, authToken string) (
 			if value.Value != nil {
 				resultData[key] = value.Value
 			} else if len(value.Children) > 0 {
-				resultData[key], err = r.setReportData(value.Children, authToken)
+				resultData[key], err = r.setReportFileData(value.Children, authToken)
 				if err != nil {
 					return
 				}
@@ -171,7 +179,7 @@ func (r *Client) setReportData(data map[string]ReportObject, authToken string) (
 // - contentType: The content type of the file.
 // - err: An error if the operation fails.
 func (r *Client) DownloadReportFile(reportId string, fileId string, authTokenString string) (content []byte, contentType string, err error) {
-	_, err = r.GetReport(reportId, authTokenString)
+	_, err = r.GetReportModel(reportId, authTokenString)
 	if err != nil {
 		return
 	}
@@ -192,7 +200,7 @@ func (r *Client) DownloadReportFile(reportId string, fileId string, authTokenStr
 // Returns:
 // - err: An error if the operation fails.
 func (r *Client) DeleteCreatedReportFile(reportId string, fileId string, authTokenString string) (err error) {
-	report, err := r.GetReport(reportId, authTokenString)
+	report, err := r.GetReportModel(reportId, authTokenString)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -207,7 +215,7 @@ func (r *Client) DeleteCreatedReportFile(reportId string, fileId string, authTok
 			report.ReportFiles = append(report.ReportFiles[:index], report.ReportFiles[index+1:]...)
 		}
 	}
-	err = r.UpdateReport(report, authTokenString)
+	err = r.UpdateReportModel(report, authTokenString)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -215,7 +223,7 @@ func (r *Client) DeleteCreatedReportFile(reportId string, fileId string, authTok
 	return
 }
 
-// SaveReport saves a report to the MongoDB database.
+// SaveReportModel saves a report to the MongoDB database.
 //
 // Parameters:
 // - templateId: A string representing the ID of the report template.
@@ -224,7 +232,7 @@ func (r *Client) DeleteCreatedReportFile(reportId string, fileId string, authTok
 //
 // Returns:
 // - err: An error if the operation fails.
-func (r *Client) SaveReport(report Report, authTokenString string) (savedReport Report, err error) {
+func (r *Client) SaveReportModel(report Report, authTokenString string) (savedReport Report, err error) {
 	claims, err := jwt.Parse(authTokenString)
 	if err != nil {
 		return
@@ -236,7 +244,7 @@ func (r *Client) SaveReport(report Report, authTokenString string) (savedReport 
 	return
 }
 
-// UpdateReport updates a report in the MongoDB database.
+// UpdateReportModel updates a report in the MongoDB database.
 //
 // Parameters:
 // - report: A Report representing the report to update.
@@ -244,14 +252,14 @@ func (r *Client) SaveReport(report Report, authTokenString string) (savedReport 
 //
 // Returns:
 // - err: An error if the operation fails.
-func (r *Client) UpdateReport(report Report, authTokenString string) (err error) {
+func (r *Client) UpdateReportModel(report Report, authTokenString string) (err error) {
 	claims, err := jwt.Parse(authTokenString)
 	if err != nil {
 		return
 	}
 	report.UserId = claims.GetUserId()
-	if len(report.ReportFiles) == 0 || report.ReportFiles == nil {
-		oldReport, e := r.GetReport(report.Id, authTokenString)
+	if report.ReportFiles == nil {
+		oldReport, e := r.GetReportModel(report.Id, authTokenString)
 		if e != nil {
 			return
 		}
@@ -261,7 +269,7 @@ func (r *Client) UpdateReport(report Report, authTokenString string) (err error)
 	return
 }
 
-// DeleteReport deletes a report and created files by its ID.
+// DeleteReport deletes a report model and created files by its ID.
 //
 // Parameters:
 // - id: The ID of the report to delete.
@@ -279,7 +287,7 @@ func (r *Client) DeleteReport(id string, authTokenString string, admin bool) (er
 	if admin {
 		req = bson.M{"_id": id}
 	}
-	report, err := r.GetReport(id, authTokenString)
+	report, err := r.GetReportModel(id, authTokenString)
 	if err != nil {
 		return
 	}
@@ -293,7 +301,7 @@ func (r *Client) DeleteReport(id string, authTokenString string, admin bool) (er
 	return res.Err()
 }
 
-// GetReport retrieves a report from the MongoDB database based on the provided ID and authentication token.
+// GetReportModel GetReport retrieves a report from the MongoDB database based on the provided ID and authentication token.
 //
 // Parameters:
 // - id: A string representing the ID of the report to retrieve.
@@ -302,7 +310,7 @@ func (r *Client) DeleteReport(id string, authTokenString string, admin bool) (er
 // Returns:
 // - report: A Report struct representing the retrieved report.
 // - err: An error if the operation fails.
-func (r *Client) GetReport(id string, authTokenString string) (report Report, err error) {
+func (r *Client) GetReportModel(id string, authTokenString string) (report Report, err error) {
 	claims, err := jwt.Parse(authTokenString)
 	if err != nil {
 		return
@@ -314,7 +322,7 @@ func (r *Client) GetReport(id string, authTokenString string) (report Report, er
 	return
 }
 
-// GetReports retrieves a list of reports from the MongoDB database based on the provided authentication token and query arguments.
+// GetReportModels retrieves a list of reports from the MongoDB database based on the provided authentication token and query arguments.
 //
 // Parameters:
 // - authTokenString: A string representing the authentication token.
@@ -324,7 +332,7 @@ func (r *Client) GetReport(id string, authTokenString string) (report Report, er
 // Returns:
 // - reports: A slice of Report structs representing the retrieved reports.
 // - err: An error if the operation fails.
-func (r *Client) GetReports(authTokenString string, args map[string][]string, admin bool) (reports []Report, err error) {
+func (r *Client) GetReportModels(authTokenString string, args map[string][]string, admin bool) (reports []Report, err error) {
 	claims, err := jwt.Parse(authTokenString)
 	if err != nil {
 		return

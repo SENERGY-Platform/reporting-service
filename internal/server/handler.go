@@ -84,7 +84,7 @@ func startAPI(reportingClient *report_engine.Client) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		result, err := reportingClient.CreateReport(request, authString)
+		result, err := reportingClient.CreateReportFile(request, authString)
 		if err != nil {
 			log.Println(err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -102,7 +102,7 @@ func startAPI(reportingClient *report_engine.Client) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		_, err := reportingClient.SaveReport(request, authString)
+		_, err := reportingClient.SaveReportModel(request, authString)
 		if err != nil {
 			log.Println(err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -118,7 +118,7 @@ func startAPI(reportingClient *report_engine.Client) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		err := reportingClient.UpdateReport(request, authString)
+		err := reportingClient.UpdateReportModel(request, authString)
 		if err != nil {
 			log.Println(err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -130,7 +130,7 @@ func startAPI(reportingClient *report_engine.Client) {
 	r.GET("/report", func(c *gin.Context) {
 		args := c.Request.URL.Query()
 		authString := c.GetHeader("Authorization")
-		reports, err := reportingClient.GetReports(authString, args, false)
+		reports, err := reportingClient.GetReportModels(authString, args, false)
 		if err != nil {
 			log.Println(err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -156,7 +156,7 @@ func startAPI(reportingClient *report_engine.Client) {
 	r.GET("/report/:id", func(c *gin.Context) {
 		id := c.Param("id")
 		authString := c.GetHeader("Authorization")
-		report, err := reportingClient.GetReport(id, authString)
+		report, err := reportingClient.GetReportModel(id, authString)
 		if err != nil {
 			log.Println(err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
