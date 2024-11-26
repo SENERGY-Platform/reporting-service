@@ -2,6 +2,7 @@ package report_engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"report-service/internal/helper"
 	"time"
@@ -18,7 +19,7 @@ func InitDB() {
 	defer cancel()
 	client, err := mongo.Connect(CTX, options.Client().ApplyURI(helper.GetEnv("MONGODB_URI", "mongodb://localhost:27017")))
 	if err != nil {
-		if CTX.Err() == context.DeadlineExceeded {
+		if errors.Is(CTX.Err(), context.DeadlineExceeded) {
 			// handle the case where the context was cancelled due to the timeout
 			fmt.Println("context cancelled due to timeout")
 		} else {
