@@ -22,6 +22,7 @@ type Template struct {
 	Name string `json:"name,omitempty"`
 	Id   string `json:"id,omitempty"`
 	Data Data   `json:"data,omitempty"`
+	Type string `json:"type,omitempty"`
 }
 
 type Data struct {

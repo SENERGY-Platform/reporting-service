@@ -22,10 +22,13 @@ type TemplateResponse struct {
 }
 
 type Template struct {
-	Name    string  `json:"name,omitempty"`
-	Id      string  `json:"_id,omitempty"`
-	ShortId string  `json:"shortid,omitempty"`
-	Data    ShortId `json:"data,omitempty"`
+	Name             string  `json:"name,omitempty"`
+	Id               string  `json:"_id,omitempty"`
+	Recipe           string  `json:"recipe,omitempty"`
+	ShortId          string  `json:"shortid,omitempty"`
+	Data             ShortId `json:"data,omitempty"`
+	CreationDate     string  `json:"creationDate,omitempty"`
+	ModificationDate string  `json:"modificationDate,omitempty"`
 }
 
 type TemplateOptions struct {

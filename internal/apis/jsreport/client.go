@@ -36,18 +36,26 @@ type Client struct {
 	HttpClient *resty.Client
 }
 
+var TypeMap = map[string]string{
+	"chrome-pdf": "PDF",
+	"xlsx":       "Excel",
+}
+
 func NewJSReportClient(url string, port string) *Client {
 	client := resty.New()
 	return &Client{Url: url, Port: port, BaseUrl: fmt.Sprintf("%v:%v", url, port), HttpClient: client}
 }
 
 func (j *Client) GetTemplates(authString string) (templates []report_engine.Template, err error) {
-	response, err := j.HttpClient.R().SetHeader("Authorization", authString).Get(j.BaseUrl + "/odata/templates?$select=name")
+	response, err := j.HttpClient.R().SetHeader("Authorization", authString).Get(j.BaseUrl + "/odata/templates?$select=name,recipe")
 	var resp TemplateResponse
 	err = json.Unmarshal(response.Body(), &resp)
 	for _, jsTemplate := range resp.Templates {
-		templates = append(templates, report_engine.Template{Id: jsTemplate.Id, Name: jsTemplate.Name})
-
+		templates = append(templates, report_engine.Template{
+			Id:   jsTemplate.Id,
+			Name: jsTemplate.Name,
+			Type: TypeMap[jsTemplate.Recipe],
+		})
 	}
 	return
 }
@@ -63,9 +71,12 @@ func (j *Client) GetTemplateById(templateId string, authString string) (template
 	}
 	template.Id = resp.Id
 	template.Name = resp.Name
+	template.Type = TypeMap[resp.Recipe]
+
 	template.Data.Id = jsData.Id
 	template.Data.Name = jsData.Name
 	template.Data.DataJSONString = jsData.DataJSON
+
 	var rawJson map[string]interface{}
 	err = json.Unmarshal([]byte(jsData.DataJSON), &rawJson)
 	if err != nil {
