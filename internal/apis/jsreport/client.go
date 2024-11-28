@@ -37,8 +37,9 @@ type Client struct {
 }
 
 var TypeMap = map[string]string{
-	"chrome-pdf": "PDF",
-	"xlsx":       "Excel",
+	"chrome-pdf":   "PDF",
+	"xlsx":         "Excel",
+	"html-to-xlsx": "Excel",
 }
 
 func NewJSReportClient(url string, port string) *Client {
