@@ -23,6 +23,7 @@ import (
 	timescaleModels "github.com/SENERGY-Platform/timescale-wrapper/pkg/model"
 	"github.com/go-resty/resty/v2"
 	"net/http"
+	"slices"
 )
 
 type Client struct {
@@ -60,5 +61,6 @@ func (s *Client) Query(authTokenString string, query timescaleModels.QueriesRequ
 	for _, value := range resp[0] {
 		data = append(data, value[1])
 	}
+	slices.Reverse(data)
 	return data, err
 }

@@ -41,10 +41,18 @@ type DataType struct {
 
 type ReportObject struct {
 	DataType
-	Value    interface{}                            `json:"value,omitempty"`
-	Query    *timescaleModels.QueriesRequestElement `json:"query,omitempty"`
-	Fields   map[string]ReportObject                `json:"fields,omitempty"`
-	Children map[string]ReportObject                `json:"children,omitempty"`
+	Value        interface{}                            `json:"value,omitempty"`
+	Query        *timescaleModels.QueriesRequestElement `json:"query,omitempty"`
+	QueryOptions *QueryOptions                          `json:"queryOptions,omitempty"`
+	Fields       map[string]ReportObject                `json:"fields,omitempty"`
+	Children     map[string]ReportObject                `json:"children,omitempty"`
+}
+
+type QueryOptions struct {
+	RollingStartDate string `json:"rollingStartDate,omitempty"`
+	RollingEndDate   string `json:"rollingEndDate,omitempty"`
+	StartOffset      int    `json:"startOffset,omitempty"`
+	EndOffset        int    `json:"endOffset,omitempty"`
 }
 
 type Report struct {

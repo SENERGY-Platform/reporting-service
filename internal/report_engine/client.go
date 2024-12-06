@@ -19,17 +19,17 @@ package report_engine
 import (
 	"errors"
 	"fmt"
-	"log"
-	"report-service/internal/apis/senergy_db_v3"
-	"report-service/internal/helper"
-	"strconv"
-	"strings"
-
 	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
 	"github.com/globalsign/mgo/bson"
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"log"
+	"report-service/internal/apis/senergy_db_v3"
+	"report-service/internal/helper"
+	"strconv"
+	"strings"
+	"time"
 )
 
 type Client struct {
@@ -133,6 +133,10 @@ func (r *Client) setReportFileData(data map[string]ReportObject, authToken strin
 				resultData[key] = value.Value
 			} else if value.Query != nil {
 				var responseData []interface{}
+				err = r.updateStartAndEndDate(&value)
+				if err != nil {
+					return
+				}
 				responseData, err = r.DBClient.Query(authToken, *value.Query)
 				if err != nil {
 					return
@@ -156,12 +160,54 @@ func (r *Client) setReportFileData(data map[string]ReportObject, authToken strin
 				}
 			} else if value.Query != nil {
 				var responseData []interface{}
+				err = r.updateStartAndEndDate(&value)
+				if err != nil {
+					return nil, err
+				}
 				responseData, err = r.DBClient.Query(authToken, *value.Query)
 				if err != nil {
 					return
 				}
 				resultData[key] = responseData
 			}
+		}
+	}
+	return
+}
+
+func (r *Client) updateStartAndEndDate(object *ReportObject) (err error) {
+	if object.QueryOptions != nil {
+		if object.QueryOptions.RollingStartDate != "" {
+			startDate, e := time.Parse(time.RFC3339, *object.Query.Time.Start)
+			if e != nil {
+				return
+			}
+			startDate = startDate.Add(time.Minute * time.Duration(-object.QueryOptions.StartOffset))
+			newDate := startDate
+			switch object.QueryOptions.RollingStartDate {
+			case "month":
+				newDate = time.Date(time.Now().Year(), time.Now().Month(), startDate.Day(), 0, 0, 0, 0, time.UTC)
+			case "year":
+				newDate = time.Date(time.Now().Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, time.UTC)
+			}
+			newDate = newDate.Add(time.Minute * time.Duration(object.QueryOptions.StartOffset))
+			*object.Query.Time.Start = newDate.Format(time.RFC3339)
+		}
+		if object.QueryOptions.RollingEndDate != "" {
+			endDate, e := time.Parse(time.RFC3339, *object.Query.Time.End)
+			if e != nil {
+				return
+			}
+			endDate = endDate.Add(time.Minute * time.Duration(-object.QueryOptions.EndOffset))
+			newDate := endDate
+			switch object.QueryOptions.RollingEndDate {
+			case "month":
+				newDate = time.Date(time.Now().Year(), time.Now().Month(), endDate.Day(), 0, 0, 0, 0, time.UTC)
+			case "year":
+				newDate = time.Date(time.Now().Year(), endDate.Month(), endDate.Day(), 0, 0, 0, 0, time.UTC)
+			}
+			newDate = newDate.Add(time.Minute * time.Duration(object.QueryOptions.EndOffset))
+			*object.Query.Time.End = newDate.Format(time.RFC3339)
 		}
 	}
 	return
