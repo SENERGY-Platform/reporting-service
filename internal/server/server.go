@@ -17,9 +17,9 @@
 package server
 
 import (
-	"report-service/internal/apis/jsreport"
-	"report-service/internal/helper"
-	"report-service/internal/report_engine"
+	"github.com/SENERGY-Platform/report-service/internal/apis/jsreport"
+	"github.com/SENERGY-Platform/report-service/internal/helper"
+	"github.com/SENERGY-Platform/report-service/internal/report_engine"
 )
 
 func Start() {

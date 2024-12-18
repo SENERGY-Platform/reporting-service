@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"report-service/internal/helper"
+	"github.com/SENERGY-Platform/report-service/internal/helper"
 	"time"
 
 	"go.mongodb.org/mongo-driver/mongo"

@@ -18,10 +18,10 @@ package server
 
 import (
 	"fmt"
+	"github.com/SENERGY-Platform/report-service/internal/helper"
+	"github.com/SENERGY-Platform/report-service/internal/report_engine"
 	"log"
 	"net/http"
-	"report-service/internal/helper"
-	"report-service/internal/report_engine"
 	"strconv"
 
 	"github.com/gin-contrib/cors"

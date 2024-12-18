@@ -17,9 +17,9 @@
 package main
 
 import (
+	"github.com/SENERGY-Platform/report-service/internal/server"
 	"github.com/joho/godotenv"
 	"log"
-	"report-service/internal/server"
 )
 
 func main() {
