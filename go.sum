@@ -8,8 +8,8 @@ github.com/SENERGY-Platform/models/go v0.0.0-20241007061544-de7132ae94e4 h1:zS65
 github.com/SENERGY-Platform/models/go v0.0.0-20241007061544-de7132ae94e4/go.mod h1:bCREPNRN4P8oxLgpC3/ZKK4jXSy4MSPXoiomhohE+aw=
 github.com/SENERGY-Platform/service-commons v0.0.0-20240813072046-91b3195dd8fc h1:FbGDfHiDukp8wD1w4YNxjwiDpSNkRUG+Ymq9jjz3Auc=
 github.com/SENERGY-Platform/service-commons v0.0.0-20240813072046-91b3195dd8fc/go.mod h1:1p2CQPNtler5leXqNgaOfr7DlgZUydrQlQYA97ycm4k=
-github.com/SENERGY-Platform/timescale-wrapper v0.0.33 h1:K4Haa5gzjg3p562PzBX5TAmJzQcYSjeMZrB+m4dgMBg=
-github.com/SENERGY-Platform/timescale-wrapper v0.0.33/go.mod h1:Xvh5x8EKS3fSzst+o7Wtfo+dNBLKbff+NXso+nkx/6o=
+github.com/SENERGY-Platform/timescale-wrapper v0.0.34 h1:w5OnArD02c4EYgFt9EfuYhzMFr1jSy78WvNLm3hLI10=
+github.com/SENERGY-Platform/timescale-wrapper v0.0.34/go.mod h1:S7YaCoKfKjSzfCiIVcDxRmZoNqmVIa3SG6igz5WSSJM=
 github.com/bradfitz/gomemcache v0.0.0-20230905024940-24af94b03874 h1:N7oVaKyGp8bttX0bfZGmcGkjz7DLQXhAn3DNd3T0ous=
 github.com/bradfitz/gomemcache v0.0.0-20230905024940-24af94b03874/go.mod h1:r5xuitiExdLAJ09PR7vBVENGvp4ZuTBeWTGtxuX3K+c=
 github.com/bytedance/sonic v1.5.0/go.mod h1:ED5hyg4y6t3/9Ku1R6dU/4KyJ48DZ4jPhfY1O2AihPM=
