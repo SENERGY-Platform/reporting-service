@@ -18,11 +18,12 @@ package server
 
 import (
 	"fmt"
-	"github.com/SENERGY-Platform/report-service/internal/helper"
-	"github.com/SENERGY-Platform/report-service/internal/report_engine"
 	"log"
 	"net/http"
 	"strconv"
+
+	"github.com/SENERGY-Platform/report-service/internal/helper"
+	"github.com/SENERGY-Platform/report-service/internal/report_engine"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -84,7 +85,7 @@ func startAPI(reportingClient *report_engine.Client) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		result, err := reportingClient.CreateReportFile(request, authString)
+		result, _, err := reportingClient.CreateReportFile(request, authString)
 		if err != nil {
 			log.Println(err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -171,7 +172,7 @@ func startAPI(reportingClient *report_engine.Client) {
 		reportId := c.Param("reportId")
 		fileId := c.Param("fileId")
 		authString := c.GetHeader("Authorization")
-		content, contentType, err := reportingClient.DownloadReportFile(reportId, fileId, authString)
+		content, contentType, _, err := reportingClient.DownloadReportFile(reportId, fileId, authString)
 		if err != nil {
 			log.Println(err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

@@ -42,7 +42,8 @@ type ReportingDriver interface {
 	// Returns:
 	// - data: The content of the report.
 	// - headerContentType: The content type of the report.
+	// - headerFileExtension: The file type extension of the report.
 	// - err: An error if the retrieval fails.
-	GetReportContent(reportId string, authString string) (data []byte, headerContentType string, err error)
+	GetReportContent(reportId string, authString string) (data []byte, headerContentType string, headerFileExtension string, err error)
 	DeleteCreatedReportFile(reportId string, authString string) (err error)
 }

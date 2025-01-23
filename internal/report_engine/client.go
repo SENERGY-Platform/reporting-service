@@ -17,6 +17,7 @@
 package report_engine
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log"
@@ -84,7 +85,7 @@ func (r *Client) GetTemplateById(id string, authString string) (template Templat
 //
 // Returns:
 // - err: An error if the operation fails.
-func (r *Client) CreateReportFile(reportRequest Report, authTokenString string) (resultReport Report, err error) {
+func (r *Client) CreateReportFile(reportRequest Report, authTokenString string) (resultReport Report, reportFileId string, err error) {
 	reportModel, err := r.GetReportModel(reportRequest.Id, authTokenString)
 	// if no report model is found, create a new one
 	if errors.Is(err, mongo.ErrNoDocuments) || reportModel.Id == "" {
@@ -225,17 +226,18 @@ func (r *Client) updateStartAndEndDate(object *ReportObject) (err error) {
 // Returns:
 // - content: The content of the file.
 // - contentType: The content type of the file.
+// - fileTypeExtension: The file type extension of the report.
 // - err: An error if the operation fails.
-func (r *Client) DownloadReportFile(reportId string, fileId string, authTokenString string) (content []byte, contentType string, err error) {
+func (r *Client) DownloadReportFile(reportId string, fileId string, authTokenString string) (content []byte, contentType string, fileTypeExtension string, err error) {
 	_, err = r.GetReportModel(reportId, authTokenString)
 	if err != nil {
 		return
 	}
-	content, contentType, err = r.Driver.GetReportContent(fileId, authTokenString)
+	content, contentType, fileTypeExtension, err = r.Driver.GetReportContent(fileId, authTokenString)
 	if err != nil {
 		return
 	}
-	return content, contentType, err
+	return content, contentType, fileTypeExtension, err
 }
 
 // DeleteCreatedReportFile deletes a report file with the given file ID from the given report.
@@ -477,12 +479,77 @@ func (r *Client) RunScheduler() error {
 			if err != nil {
 				return err
 			}
-			_, err = r.CreateReportFile(report, token.Token) // already calculates and saves next schedule
+			_, reportFileId, err := r.CreateReportFile(report, token.Token) // already calculates and saves next schedule
 			if err != nil {
 				return err
 			}
+			if report.EmailAfterCron {
+				_, err = r.EmailReport(report.Id, reportFileId, token)
+				if err != nil {
+					return err
+				}
+			}
 		}
 	}
+}
+
+// EmailReport analyzes the token provided and sends the specified report file to the user if the token contains an email address and the EmailVerified flag
+//
+// Parameters:
+// - reportId: ID of the report to send
+// - reportFileId: File ID of the file to send
+// - token: Token of the user to send the report file to
+//
+// Returns:
+// - sent: true if an email has been sent, false otherwise
+// - err: An error if the operation fails.
+func (r *Client) EmailReport(reportId, reportFileId string, token jwt.Token) (sent bool, err error) {
+	if len(token.Email) == 0 || !token.EmailVerified {
+		return false, nil
+	}
+	b, contentType, fileTypeExtension, err := r.DownloadReportFile(reportId, reportFileId, token.Token)
+	if err != nil {
+		return false, err
+	}
+	email := SendRequest{
+		To: []FromTo{{
+			Email: token.Email,
+		}},
+		From: FromTo{
+			Email: helper.GetEnv("EMAIL_FROM", ""),
+		},
+		Attachments: []struct {
+			// Base64-encoded string of the file content
+			// required: true
+			// example: iVBORw0KGgoAAAANSUhEUgAAAEEAAAA8CAMAAAAOlSdoAAAACXBIWXMAAAHrAAAB6wGM2bZBAAAAS1BMVEVHcEwRfnUkZ2gAt4UsSF8At4UtSV4At4YsSV4At4YsSV8At4YsSV4At4YsSV4sSV4At4YsSV4At4YtSV4At4YsSV4At4YtSV8At4YsUWYNAAAAGHRSTlMAAwoXGiktRE5dbnd7kpOlr7zJ0d3h8PD8PCSRAAACWUlEQVR42pXT4ZaqIBSG4W9rhqQYocG+/ys9Y0Z0Br+x3j8zaxUPewFh65K+7yrIMeIY4MT3wPfEJCidKXEMnLaVkxDiELiMz4WEOAZSFghxBIypCOlKiAMgXfIqTnBgSm8CIQ6BImxEUxEckClVQiHGj4Ba4AQHikAIClwTE9KtIghAhUJwoLkmLnCiAHJLRKgIMsEtVUKbBUIwoAg2C4QgQBE6l4VCnApBgSKYLLApCnCa0+96AEMW2BQcmC+Pr3nfp7o5Exy49gIADcIqUELGfeA+bp93LmAJp8QJoEcN3C7NY3sbVANixMyI0nku20/n5/ZRf3KI2k6JEDWQtxcbdGuAqu3TAXG+/799Oyyas1B1MnMiA+XyxHp9q0PUKGPiRAau1fZbLRZV09wZcT8/gHk8QQAxXn8VgaDqcUmU6O/r28nbVwXAqca2mRNtPAF5+zoP2MeN9Fy4NgC6RfcbgE7XITBRYTtOE3U3C2DVff7pk+PkUxgAbvtnPXJaD6DxulMLwOhPS/M3MQkgg1ZFrIXnmfaZoOfpKiFgzeZD/WuKqQEGrfJYkyWf6vlG3xUgTuscnkNkQsb599q124kdpMUjCa/XARHs1gZymVtGt3wLkiFv8rUgTxitYCex5EVGec0Y9VmoDTFBSQte2TfXGXlf7hbdaUM9Sk7fisEN9qfBBTK+FZcvM9fQSdkl2vj4W2oX/bRogO3XasiNH7R0eW7fgRM834ImTg+Lg6BEnx4vz81rhr+MYPBBQg1v8GndEOrthxaCTxNAOut8WKLGZQl+MPz88Q9tAO/hVuSeqQAAAABJRU5ErkJggg==
+			Content string
+			// Filename
+			// required: true
+			// example: mailpit.png
+			Filename string
+			// Optional Content Type for the the attachment.
+			// If this field is not set (or empty) then the content type is automatically detected.
+			// required: false
+			// example: image/png
+			ContentType string
+			// Optional Content-ID (`cid`) for attachment.
+			// If this field is set then the file is attached inline.
+			// required: false
+			// example: mailpit-logo
+			ContentID string
+		}{{
+			Content:     base64.StdEncoding.EncodeToString(b),
+			ContentType: contentType,
+			Filename:    helper.GetEnv("EMAIL_FILENAME", "report") + "." + fileTypeExtension,
+		}},
+		Subject: helper.GetEnv("EMAIL_SUBJECT", "Report"),
+		Text:    helper.GetEnv("EMAIL_Text", "Report attached to this email"),
+	}
+	_, err = email.Send(helper.GetEnv("MAILPIT_URL", "mailpit.notifier"))
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func calculateNextSchedule(r Report) (t *time.Time, err error) {

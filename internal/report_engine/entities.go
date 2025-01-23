@@ -17,8 +17,15 @@
 package report_engine
 
 import (
-	timescaleModels "github.com/SENERGY-Platform/timescale-wrapper/pkg/model"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
 	"time"
+
+	timescaleModels "github.com/SENERGY-Platform/timescale-wrapper/pkg/model"
+	mailpit "github.com/axllent/mailpit/server/apiv1"
 )
 
 type Template struct {
@@ -59,17 +66,18 @@ type QueryOptions struct {
 }
 
 type Report struct {
-	Id           string                  `bson:"_id" json:"id,omitempty"`
-	Name         string                  `json:"name,omitempty"`
-	TemplateName string                  `json:"templateName,omitempty"`
-	Data         map[string]ReportObject `json:"data,omitempty"`
-	TemplateId   string                  `json:"templateId,omitempty"`
-	UserId       string                  `json:"userId,omitempty"`
-	ReportFiles  []ReportFile            `json:"reportFiles,omitempty"`
-	Cron         string                  `json:"cron,omitempty"`
-	ScheduledFor *time.Time              `json:"-"` // internal use
-	CreatedAt    time.Time               `json:"createdAt,omitempty"`
-	UpdatedAt    time.Time               `json:"updatedAt,omitempty"`
+	Id             string                  `bson:"_id" json:"id,omitempty"`
+	Name           string                  `json:"name,omitempty"`
+	TemplateName   string                  `json:"templateName,omitempty"`
+	Data           map[string]ReportObject `json:"data,omitempty"`
+	TemplateId     string                  `json:"templateId,omitempty"`
+	UserId         string                  `json:"userId,omitempty"`
+	ReportFiles    []ReportFile            `json:"reportFiles,omitempty"`
+	Cron           string                  `json:"cron,omitempty"`
+	ScheduledFor   *time.Time              `json:"-"` // internal use
+	EmailAfterCron bool                    `json:"emailAfterCron"`
+	CreatedAt      time.Time               `json:"createdAt,omitempty"`
+	UpdatedAt      time.Time               `json:"updatedAt,omitempty"`
 }
 
 type ReportFile struct {
@@ -77,4 +85,32 @@ type ReportFile struct {
 	Link      string    `json:"-"`
 	Type      string    `json:"type,omitempty"`
 	CreatedAt time.Time `json:"createdAt,omitempty"`
+}
+
+type FromTo = struct {
+	Name  string
+	Email string
+}
+
+type SendRequest mailpit.SendRequest
+
+func (s *SendRequest) Send(remoteAddress string) (messageId string, err error) {
+	body, err := json.Marshal(s)
+	if err != nil {
+		panic(err)
+	}
+	req, err := http.NewRequest(http.MethodPost, remoteAddress+"/api/v1/send", bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode > 299 {
+		return "", fmt.Errorf("unexpected statuscode %v : %v", resp.StatusCode, string(respBody))
+	}
+	return string(respBody), nil
+
 }

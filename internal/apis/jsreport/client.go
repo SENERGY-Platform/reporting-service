@@ -178,14 +178,14 @@ func (j *Client) CreateReport(reportName string, templateName string, data map[s
 // - data: The content of the report.
 // - headerContentType: The content type of the report.
 // - err: An error if the retrieval fails.
-func (j *Client) GetReportContent(reportId string, authString string) (data []byte, headerContentType string, err error) {
+func (j *Client) GetReportContent(reportId string, authString string) (data []byte, headerContentType string, headerFileExtension string, err error) {
 	response, err := j.HttpClient.R().
 		SetHeader("Authorization", authString).
 		Get(j.BaseUrl + "/reports/" + reportId + "/content")
 	if err != nil {
 		return
 	}
-	return response.Body(), response.Header().Get("Content-Type"), err
+	return response.Body(), response.Header().Get("Content-Type"), response.Header().Get("File-Extension"), err
 }
 
 func (j *Client) DeleteCreatedReportFile(reportId string, authString string) (err error) {
