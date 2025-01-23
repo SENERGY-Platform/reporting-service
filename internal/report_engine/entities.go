@@ -71,7 +71,8 @@ type Report struct {
 }
 
 type ReportFile struct {
-	Id   string `json:"id,omitempty"`
-	Link string `json:"-"`
-	Type string `json:"type,omitempty"`
+	Id        string    `json:"id,omitempty"`
+	Link      string    `json:"-"`
+	Type      string    `json:"type,omitempty"`
+	CreatedAt time.Time `json:"createdAt,omitempty"`
 }
