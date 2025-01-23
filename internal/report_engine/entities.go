@@ -16,7 +16,10 @@
 
 package report_engine
 
-import timescaleModels "github.com/SENERGY-Platform/timescale-wrapper/pkg/model"
+import (
+	timescaleModels "github.com/SENERGY-Platform/timescale-wrapper/pkg/model"
+	"time"
+)
 
 type Template struct {
 	Name string `json:"name,omitempty"`
@@ -63,6 +66,8 @@ type Report struct {
 	TemplateId   string                  `json:"templateId,omitempty"`
 	UserId       string                  `json:"userId,omitempty"`
 	ReportFiles  []ReportFile            `json:"reportFiles,omitempty"`
+	CreatedAt    time.Time               `json:"createdAt,omitempty"`
+	UpdatedAt    time.Time               `json:"updatedAt,omitempty"`
 }
 
 type ReportFile struct {

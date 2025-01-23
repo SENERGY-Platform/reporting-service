@@ -285,6 +285,7 @@ func (r *Client) SaveReportModel(report Report, authTokenString string) (savedRe
 	}
 	report.Id = uuid.New().String()
 	report.UserId = claims.GetUserId()
+	report.CreatedAt = time.Now()
 	_, err = Reports().InsertOne(CTX, report)
 	savedReport = report
 	return
@@ -304,6 +305,7 @@ func (r *Client) UpdateReportModel(report Report, authTokenString string) (err e
 		return
 	}
 	report.UserId = claims.GetUserId()
+	report.UpdatedAt = time.Now()
 	if report.ReportFiles == nil {
 		oldReport, e := r.GetReportModel(report.Id, authTokenString)
 		if e != nil {
