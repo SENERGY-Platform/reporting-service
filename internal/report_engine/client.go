@@ -19,17 +19,19 @@ package report_engine
 import (
 	"errors"
 	"fmt"
+	"log"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/SENERGY-Platform/report-service/internal/apis/senergy_db_v3"
 	"github.com/SENERGY-Platform/report-service/internal/helper"
 	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
 	"github.com/globalsign/mgo/bson"
 	"github.com/google/uuid"
+	"github.com/robfig/cron/v3"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"log"
-	"strconv"
-	"strings"
-	"time"
 )
 
 type Client struct {
@@ -285,6 +287,11 @@ func (r *Client) SaveReportModel(report Report, authTokenString string) (savedRe
 	}
 	report.Id = uuid.New().String()
 	report.UserId = claims.GetUserId()
+	ts, err := calculateNextSchedule(report)
+	if err != nil {
+		return
+	}
+	report.ScheduledFor = ts
 	report.CreatedAt = time.Now()
 	_, err = Reports().InsertOne(CTX, report)
 	savedReport = report
@@ -305,6 +312,11 @@ func (r *Client) UpdateReportModel(report Report, authTokenString string) (err e
 		return
 	}
 	report.UserId = claims.GetUserId()
+	ts, err := calculateNextSchedule(report)
+	if err != nil {
+		return
+	}
+	report.ScheduledFor = ts
 	report.UpdatedAt = time.Now()
 	if report.ReportFiles == nil {
 		oldReport, e := r.GetReportModel(report.Id, authTokenString)
@@ -428,4 +440,59 @@ func (r *Client) GetReportModels(authTokenString string, args map[string][]strin
 		reports = append(reports, elem)
 	}
 	return
+}
+
+// RunScheduler regularly checks if any reports need to be created based on their cron schedule and handles report creation accordingly.
+// The method blocks until any error occurs.
+//
+// Parameters:
+//
+// Returns:
+// - err: An error if the operation fails.
+func (r *Client) RunScheduler() error {
+	tickerDur, err := time.ParseDuration(helper.GetEnv("SCHEDULER_TICKER_DURATION", "1m"))
+	if err != nil {
+		return err
+	}
+	ticker := time.NewTicker(tickerDur)
+	for {
+		<-ticker.C
+		cur, err := Reports().Find(CTX, bson.M{"scheduledfor": bson.M{"$lt": time.Now()}})
+		if err != nil {
+			return err
+		}
+		for cur.Next(CTX) {
+			var report Report
+			err := cur.Decode(&report)
+			if err != nil {
+				return err
+			}
+			log.Println("Creating scheduled report file for " + report.Id)
+			token, _, err := jwt.ExchangeUserToken(
+				helper.GetEnv("KEYCLOAK_URL", "http://localhost"),
+				helper.GetEnv("KEYCLOAK_CLIENT_ID", ""),
+				helper.GetEnv("KEYCLOAK_CLIENT_SECRET", ""),
+				report.UserId,
+			)
+			if err != nil {
+				return err
+			}
+			_, err = r.CreateReportFile(report, token.Token) // already calculates and saves next schedule
+			if err != nil {
+				return err
+			}
+		}
+	}
+}
+
+func calculateNextSchedule(r Report) (t *time.Time, err error) {
+	if len(r.Cron) == 0 {
+		return nil, nil
+	}
+	schedule, err := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow).Parse(r.Cron)
+	if err != nil {
+		return nil, err
+	}
+	ts := schedule.Next(time.Now())
+	return &ts, err
 }

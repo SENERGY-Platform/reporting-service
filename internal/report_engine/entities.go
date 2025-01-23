@@ -66,6 +66,8 @@ type Report struct {
 	TemplateId   string                  `json:"templateId,omitempty"`
 	UserId       string                  `json:"userId,omitempty"`
 	ReportFiles  []ReportFile            `json:"reportFiles,omitempty"`
+	Cron         string                  `json:"cron,omitempty"`
+	ScheduledFor *time.Time              `json:"-"` // internal use
 	CreatedAt    time.Time               `json:"createdAt,omitempty"`
 	UpdatedAt    time.Time               `json:"updatedAt,omitempty"`
 }

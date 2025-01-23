@@ -5,7 +5,7 @@ go 1.23
 toolchain go1.23.4
 
 require (
-	github.com/SENERGY-Platform/service-commons v0.0.0-20240813072046-91b3195dd8fc
+	github.com/SENERGY-Platform/service-commons v0.0.0-20250123093503-e1f92a58c3fb
 	github.com/SENERGY-Platform/timescale-wrapper v0.0.34
 	github.com/gin-contrib/cors v1.5.0
 	github.com/gin-gonic/gin v1.9.1
@@ -13,6 +13,7 @@ require (
 	github.com/go-resty/resty/v2 v2.11.0
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
+	github.com/robfig/cron/v3 v3.0.1
 	go.mongodb.org/mongo-driver v1.16.1
 )
 

@@ -17,6 +17,8 @@
 package server
 
 import (
+	"log"
+
 	"github.com/SENERGY-Platform/report-service/internal/apis/jsreport"
 	"github.com/SENERGY-Platform/report-service/internal/helper"
 	"github.com/SENERGY-Platform/report-service/internal/report_engine"
@@ -26,6 +28,12 @@ func Start() {
 	client := report_engine.NewClient(jsreport.NewJSReportClient(
 		helper.GetEnv("JSREPORT_SERVER_URL", "http://localhost"),
 		helper.GetEnv("JSREPORT_SERVER_PORT", "5488")))
+	go func() {
+		err := client.RunScheduler()
+		if err != nil {
+			log.Fatal("ERROR: " + err.Error())
+		}
+	}()
 	report_engine.InitDB()
 	defer report_engine.CloseDB()
 	startAPI(client)
