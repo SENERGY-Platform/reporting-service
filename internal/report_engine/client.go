@@ -545,7 +545,7 @@ func (r *Client) EmailReport(reportId, reportFileId string, token jwt.Token) (se
 		Subject: helper.GetEnv("EMAIL_SUBJECT", "Report"),
 		Text:    helper.GetEnv("EMAIL_TEXT", "Report attached to this email"),
 	}
-	_, err = email.Send(helper.GetEnv("MAILPIT_URL", "http://mailpit.notifier"))
+	_, err = email.Send(helper.GetEnv("MAILPIT_URL", "http://mailpit.notifier:8025"))
 	if err != nil {
 		return false, err
 	}
