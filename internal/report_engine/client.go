@@ -540,10 +540,10 @@ func (r *Client) EmailReport(reportId, reportFileId string, token jwt.Token) (se
 		}{{
 			Content:     base64.StdEncoding.EncodeToString(b),
 			ContentType: contentType,
-			Filename:    helper.GetEnv("EMAIL_FILENAME", "report") + "." + fileTypeExtension,
+			Filename:    reportFileId + "." + fileTypeExtension,
 		}},
 		Subject: helper.GetEnv("EMAIL_SUBJECT", "Report"),
-		Text:    helper.GetEnv("EMAIL_Text", "Report attached to this email"),
+		Text:    helper.GetEnv("EMAIL_TEXT", "Report attached to this email"),
 	}
 	_, err = email.Send(helper.GetEnv("MAILPIT_URL", "mailpit.notifier"))
 	if err != nil {
