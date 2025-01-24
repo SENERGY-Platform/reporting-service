@@ -75,7 +75,10 @@ type Report struct {
 	ReportFiles    []ReportFile            `json:"reportFiles,omitempty"`
 	Cron           string                  `json:"cron,omitempty"`
 	ScheduledFor   *time.Time              `json:"-"` // internal use
-	EmailAfterCron bool                    `json:"emailAfterCron"`
+	EmailReceivers []string                `json:"emailReceivers"`
+	EmailSubject   string                  `json:"emailSubject,omitempty"`
+	EmailText      string                  `json:"emailText,omitempty"`
+	EmailHTML      string                  `json:"emailHTML,omitempty"`
 	CreatedAt      time.Time               `json:"createdAt,omitempty"`
 	UpdatedAt      time.Time               `json:"updatedAt,omitempty"`
 }

@@ -483,38 +483,42 @@ func (r *Client) RunScheduler() error {
 			if err != nil {
 				return err
 			}
-			if report.EmailAfterCron {
-				_, err = r.EmailReport(report.Id, reportFileId, token)
-				if err != nil {
-					return err
-				}
+			_, err = r.EmailReport(reportFileId, report, token.Token)
+			if err != nil {
+				return err
 			}
 		}
 	}
 }
 
-// EmailReport analyzes the token provided and sends the specified report file to the user if the token contains an email address and the EmailVerified flag
+// EmailReport sends the specified report file to the email adrdesses specified in the report
 //
 // Parameters:
-// - reportId: ID of the report to send
 // - reportFileId: File ID of the file to send
+// - report: Report
 // - token: Token of the user to send the report file to
 //
 // Returns:
 // - sent: true if an email has been sent, false otherwise
 // - err: An error if the operation fails.
-func (r *Client) EmailReport(reportId, reportFileId string, token jwt.Token) (sent bool, err error) {
-	if len(token.Email) == 0 || !token.EmailVerified {
+func (r *Client) EmailReport(reportFileId string, report Report, token string) (sent bool, err error) {
+	if len(report.EmailReceivers) == 0 {
 		return false, nil
 	}
-	b, contentType, fileTypeExtension, err := r.DownloadReportFile(reportId, reportFileId, token.Token)
+	b, contentType, fileTypeExtension, err := r.DownloadReportFile(report.Id, reportFileId, token)
 	if err != nil {
 		return false, err
 	}
+	subject := report.EmailSubject
+	if len(subject) == 0 {
+		subject = helper.GetEnv("EMAIL_SUBJECT", "Report")
+	}
+	text := report.EmailText
+	if len(text) == 0 {
+		text = helper.GetEnv("EMAIL_TEXT", "Report attached to this email")
+	}
 	email := SendRequest{
-		To: []FromTo{{
-			Email: token.Email,
-		}},
+		Bcc: report.EmailReceivers,
 		From: FromTo{
 			Email: helper.GetEnv("EMAIL_FROM", ""),
 		},
@@ -542,8 +546,9 @@ func (r *Client) EmailReport(reportId, reportFileId string, token jwt.Token) (se
 			ContentType: contentType,
 			Filename:    reportFileId + "." + fileTypeExtension,
 		}},
-		Subject: helper.GetEnv("EMAIL_SUBJECT", "Report"),
-		Text:    helper.GetEnv("EMAIL_TEXT", "Report attached to this email"),
+		Subject: subject,
+		Text:    text,
+		HTML:    report.EmailHTML,
 	}
 	_, err = email.Send(helper.GetEnv("MAILPIT_URL", "http://mailpit.notifier:8025"))
 	if err != nil {
