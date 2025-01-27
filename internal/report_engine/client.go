@@ -163,11 +163,17 @@ func (r *Client) setReportFileData(data map[string]ReportObject, authToken strin
 			if value.Value != nil {
 				resultData[key] = value.Value
 			} else if len(value.Children) > 0 {
-				resultData[key], err = r.setReportFileData(value.Children, authToken)
-				if err != nil {
+				arrayData, e := r.setReportFileData(value.Children, authToken)
+				if e != nil {
 					return
 				}
-				if len(resultData[key].(map[string]interface{})) == 0 {
+				// convert map[string]interface{} to []interface{}
+				var dataSlice []interface{}
+				for _, v := range arrayData {
+					dataSlice = append(dataSlice, v)
+				}
+				resultData[key] = dataSlice
+				if len(resultData[key].([]interface{})) == 0 {
 					delete(resultData, key)
 				}
 			} else if value.Query != nil {
