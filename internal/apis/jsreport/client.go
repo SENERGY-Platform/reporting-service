@@ -49,8 +49,14 @@ func NewJSReportClient(url string, port string) *Client {
 
 func (j *Client) GetTemplates(authString string) (templates []report_engine.Template, err error) {
 	response, err := j.HttpClient.R().SetHeader("Authorization", authString).Get(j.BaseUrl + "/odata/templates?$select=name,recipe")
+	if err != nil {
+		return
+	}
 	var resp TemplateResponse
 	err = json.Unmarshal(response.Body(), &resp)
+	if err != nil {
+		return
+	}
 	for _, jsTemplate := range resp.Templates {
 		templates = append(templates, report_engine.Template{
 			Id:   jsTemplate.Id,
