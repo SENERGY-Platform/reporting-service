@@ -141,6 +141,7 @@ func (r *Client) setReportFileData(data map[string]ReportObject, authToken strin
 					return
 				}
 				responseData, err = r.DBClient.Query(authToken, *value.Query)
+				responseData = r.filterQueryValues(responseData)
 				if err != nil {
 					return
 				}
@@ -168,11 +169,23 @@ func (r *Client) setReportFileData(data map[string]ReportObject, authToken strin
 					return nil, err
 				}
 				responseData, err = r.DBClient.Query(authToken, *value.Query)
+				responseData = r.filterQueryValues(responseData)
 				if err != nil {
 					return
 				}
 				resultData[key] = responseData
 			}
+		}
+	}
+	return
+}
+
+func (r *Client) filterQueryValues(queryValues []interface{}) (filteredData []interface{}) {
+	for _, value := range queryValues {
+		if value != nil {
+			filteredData = append(filteredData, value)
+		} else {
+			filteredData = append(filteredData, 0)
 		}
 	}
 	return
