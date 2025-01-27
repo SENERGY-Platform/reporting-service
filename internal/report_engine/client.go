@@ -148,9 +148,14 @@ func (r *Client) setReportFileData(data map[string]ReportObject, authToken strin
 				if len(responseData) > 0 {
 					resultData[key] = responseData[0]
 				}
+			} else {
+				delete(resultData, key)
 			}
 		case "object":
 			resultData[key], err = r.setReportFileData(value.Fields, authToken)
+			if len(resultData[key].(map[string]interface{})) == 0 {
+				delete(resultData, key)
+			}
 			if err != nil {
 				return
 			}
@@ -161,6 +166,9 @@ func (r *Client) setReportFileData(data map[string]ReportObject, authToken strin
 				resultData[key], err = r.setReportFileData(value.Children, authToken)
 				if err != nil {
 					return
+				}
+				if len(resultData[key].(map[string]interface{})) == 0 {
+					delete(resultData, key)
 				}
 			} else if value.Query != nil {
 				var responseData []interface{}
