@@ -326,6 +326,7 @@ func (r *Client) UpdateReportModel(report Report, authTokenString string) (err e
 			return
 		}
 		report.ReportFiles = oldReport.ReportFiles
+		report.CreatedAt = oldReport.CreatedAt
 	}
 	_, err = Reports().ReplaceOne(CTX, bson.M{"_id": report.Id, "userid": claims.GetUserId()}, report, options.Replace().SetUpsert(true))
 	return
