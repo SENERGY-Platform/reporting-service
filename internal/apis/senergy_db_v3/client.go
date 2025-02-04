@@ -63,7 +63,7 @@ func (s *Client) Query(authTokenString string, query timescaleModels.QueriesRequ
 		switch queryOptions.ResultObject {
 		case "key":
 			data = append(data, value[queryOptions.ResultKey])
-		case "object":
+		case "array":
 			data = append(data, value)
 		default:
 			data = append(data, value[1])
