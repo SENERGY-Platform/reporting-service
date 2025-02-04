@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/SENERGY-Platform/report-service/internal/report_engine"
+	"github.com/SENERGY-Platform/report-service/internal/models"
 	"log"
 	"net/http"
 	"net/url"
@@ -47,7 +47,7 @@ func NewJSReportClient(url string, port string) *Client {
 	return &Client{Url: url, Port: port, BaseUrl: fmt.Sprintf("%v:%v", url, port), HttpClient: client}
 }
 
-func (j *Client) GetTemplates(authString string) (templates []report_engine.Template, err error) {
+func (j *Client) GetTemplates(authString string) (templates []models.Template, err error) {
 	response, err := j.HttpClient.R().SetHeader("Authorization", authString).Get(j.BaseUrl + "/odata/templates?$select=name,recipe")
 	if err != nil {
 		return
@@ -58,7 +58,7 @@ func (j *Client) GetTemplates(authString string) (templates []report_engine.Temp
 		return
 	}
 	for _, jsTemplate := range resp.Templates {
-		templates = append(templates, report_engine.Template{
+		templates = append(templates, models.Template{
 			Id:   jsTemplate.Id,
 			Name: jsTemplate.Name,
 			Type: TypeMap[jsTemplate.Recipe],
@@ -67,7 +67,7 @@ func (j *Client) GetTemplates(authString string) (templates []report_engine.Temp
 	return
 }
 
-func (j *Client) GetTemplateById(templateId string, authString string) (template report_engine.Template, err error) {
+func (j *Client) GetTemplateById(templateId string, authString string) (template models.Template, err error) {
 	response, err := j.HttpClient.R().SetHeader("Authorization", authString).Get(j.BaseUrl + "/odata/templates('" + templateId + "')")
 	var resp Template
 	err = json.Unmarshal(response.Body(), &resp)
@@ -93,16 +93,16 @@ func (j *Client) GetTemplateById(templateId string, authString string) (template
 	return
 }
 
-func getJsonKeysAndTypes(jsonData map[string]interface{}) (result map[string]report_engine.DataType) {
-	result = make(map[string]report_engine.DataType)
+func getJsonKeysAndTypes(jsonData map[string]interface{}) (result map[string]models.DataType) {
+	result = make(map[string]models.DataType)
 
 	for key, value := range jsonData {
 		if _, ok := result[key]; !ok {
-			result[key] = report_engine.DataType{}
+			result[key] = models.DataType{}
 		}
 
 		if mapValue, ok := value.(map[string]interface{}); ok { // map
-			result[key] = report_engine.DataType{
+			result[key] = models.DataType{
 				Name:      key,
 				ValueType: "object",
 				Fields:    getJsonKeysAndTypes(mapValue),
@@ -113,14 +113,14 @@ func getJsonKeysAndTypes(jsonData map[string]interface{}) (result map[string]rep
 				childrenMap[strconv.Itoa(i)] = arrayValue[i]
 			}
 			children := getJsonKeysAndTypes(childrenMap)
-			result[key] = report_engine.DataType{
+			result[key] = models.DataType{
 				Name:      key,
 				ValueType: "array",
 				Length:    len(arrayValue),
 				Children:  children,
 			}
 		} else {
-			result[key] = report_engine.DataType{
+			result[key] = models.DataType{
 				Name:      key,
 				ValueType: fmt.Sprintf("%v", reflect.TypeOf(value)),
 			}

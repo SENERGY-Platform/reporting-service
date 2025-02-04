@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/SENERGY-Platform/report-service/internal/models"
 	"log"
 	"strconv"
 	"strings"
@@ -58,7 +59,7 @@ func NewClient(driver ReportingDriver) *Client {
 // GetTemplates retrieves a list of available report templates.
 //
 // Returns a slice of Template objects and an error if the operation fails.
-func (r *Client) GetTemplates(authTokenString string) (templates []Template, err error) {
+func (r *Client) GetTemplates(authTokenString string) (templates []models.Template, err error) {
 	templates, err = r.Driver.GetTemplates(authTokenString)
 	return
 }
@@ -71,7 +72,7 @@ func (r *Client) GetTemplates(authTokenString string) (templates []Template, err
 // Returns:
 // - template: The retrieved template.
 // - err: An error if the retrieval fails.
-func (r *Client) GetTemplateById(id string, authString string) (template Template, err error) {
+func (r *Client) GetTemplateById(id string, authString string) (template models.Template, err error) {
 	template, err = r.Driver.GetTemplateById(id, authString)
 	return
 }
@@ -85,7 +86,7 @@ func (r *Client) GetTemplateById(id string, authString string) (template Templat
 //
 // Returns:
 // - err: An error if the operation fails.
-func (r *Client) CreateReportFile(reportRequest Report, authTokenString string) (resultReport Report, reportFileId string, err error) {
+func (r *Client) CreateReportFile(reportRequest models.Report, authTokenString string) (resultReport models.Report, reportFileId string, err error) {
 	reportModel, err := r.GetReportModel(reportRequest.Id, authTokenString)
 	// if no report model is found, create a new one
 	if errors.Is(err, mongo.ErrNoDocuments) || reportModel.Id == "" {
@@ -109,7 +110,7 @@ func (r *Client) CreateReportFile(reportRequest Report, authTokenString string) 
 	}
 
 	// add the report file model to the report model
-	reportRequest.ReportFiles = append(reportRequest.ReportFiles, ReportFile{Id: reportFileId, Type: reportFileType, Link: reportFileLink, CreatedAt: time.Now()})
+	reportRequest.ReportFiles = append(reportRequest.ReportFiles, models.ReportFile{Id: reportFileId, Type: reportFileType, Link: reportFileLink, CreatedAt: time.Now()})
 	err = r.UpdateReportModel(reportRequest, authTokenString)
 	if err != nil {
 		return
@@ -127,7 +128,7 @@ func (r *Client) CreateReportFile(reportRequest Report, authTokenString string) 
 // Returns:
 // - resultData: A map of interface{} containing the processed report data.
 // - err: An error if the operation fails.
-func (r *Client) setReportFileData(data map[string]ReportObject, authToken string) (resultData map[string]interface{}, err error) {
+func (r *Client) setReportFileData(data map[string]models.ReportObject, authToken string) (resultData map[string]interface{}, err error) {
 	resultData = make(map[string]interface{}, len(data))
 	for key, value := range data {
 		switch value.ValueType {
@@ -140,7 +141,7 @@ func (r *Client) setReportFileData(data map[string]ReportObject, authToken strin
 				if err != nil {
 					return
 				}
-				responseData, err = r.DBClient.Query(authToken, *value.Query)
+				responseData, err = r.DBClient.Query(authToken, *value.Query, *value.QueryOptions)
 				responseData = r.filterQueryValues(responseData)
 				if err != nil {
 					return
@@ -182,7 +183,7 @@ func (r *Client) setReportFileData(data map[string]ReportObject, authToken strin
 				if err != nil {
 					return nil, err
 				}
-				responseData, err = r.DBClient.Query(authToken, *value.Query)
+				responseData, err = r.DBClient.Query(authToken, *value.Query, *value.QueryOptions)
 				responseData = r.filterQueryValues(responseData)
 				if err != nil {
 					return
@@ -205,7 +206,7 @@ func (r *Client) filterQueryValues(queryValues []interface{}) (filteredData []in
 	return
 }
 
-func (r *Client) updateStartAndEndDate(object *ReportObject) (err error) {
+func (r *Client) updateStartAndEndDate(object *models.ReportObject) (err error) {
 	if object.QueryOptions != nil {
 		if object.QueryOptions.RollingStartDate != "" {
 			startDate, e := time.Parse(time.RFC3339, *object.Query.Time.Start)
@@ -309,7 +310,7 @@ func (r *Client) DeleteCreatedReportFile(reportId string, fileId string, authTok
 //
 // Returns:
 // - err: An error if the operation fails.
-func (r *Client) SaveReportModel(report Report, authTokenString string) (savedReport Report, err error) {
+func (r *Client) SaveReportModel(report models.Report, authTokenString string) (savedReport models.Report, err error) {
 	claims, err := jwt.Parse(authTokenString)
 	if err != nil {
 		return
@@ -335,7 +336,7 @@ func (r *Client) SaveReportModel(report Report, authTokenString string) (savedRe
 //
 // Returns:
 // - err: An error if the operation fails.
-func (r *Client) UpdateReportModel(report Report, authTokenString string) (err error) {
+func (r *Client) UpdateReportModel(report models.Report, authTokenString string) (err error) {
 	claims, err := jwt.Parse(authTokenString)
 	if err != nil {
 		return
@@ -400,14 +401,14 @@ func (r *Client) DeleteReport(id string, authTokenString string, admin bool) (er
 // Returns:
 // - report: A Report struct representing the retrieved report.
 // - err: An error if the operation fails.
-func (r *Client) GetReportModel(id string, authTokenString string) (report Report, err error) {
+func (r *Client) GetReportModel(id string, authTokenString string) (report models.Report, err error) {
 	claims, err := jwt.Parse(authTokenString)
 	if err != nil {
 		return
 	}
 	err = Reports().FindOne(CTX, bson.M{"_id": id, "userid": claims.GetUserId()}).Decode(&report)
 	if err != nil {
-		return Report{}, err
+		return models.Report{}, err
 	}
 	return
 }
@@ -422,7 +423,7 @@ func (r *Client) GetReportModel(id string, authTokenString string) (report Repor
 // Returns:
 // - reports: A slice of Report structs representing the retrieved reports.
 // - err: An error if the operation fails.
-func (r *Client) GetReportModels(authTokenString string, args map[string][]string, admin bool) (reports []Report, err error) {
+func (r *Client) GetReportModels(authTokenString string, args map[string][]string, admin bool) (reports []models.Report, err error) {
 	claims, err := jwt.Parse(authTokenString)
 	if err != nil {
 		return
@@ -461,7 +462,7 @@ func (r *Client) GetReportModels(authTokenString string, args map[string][]strin
 	}
 	for cur.Next(CTX) {
 		// create a value into which the single document can be decoded
-		var elem Report
+		var elem models.Report
 		err := cur.Decode(&elem)
 		if err != nil {
 			log.Fatal(err)
@@ -492,7 +493,7 @@ func (r *Client) RunScheduler() error {
 			return err
 		}
 		for cur.Next(CTX) {
-			var report Report
+			var report models.Report
 			err := cur.Decode(&report)
 			if err != nil {
 				return err
@@ -529,7 +530,7 @@ func (r *Client) RunScheduler() error {
 // Returns:
 // - sent: true if an email has been sent, false otherwise
 // - err: An error if the operation fails.
-func (r *Client) EmailReport(reportFileId string, report Report, token string) (sent bool, err error) {
+func (r *Client) EmailReport(reportFileId string, report models.Report, token string) (sent bool, err error) {
 	if len(report.EmailReceivers) == 0 {
 		return false, nil
 	}
@@ -545,9 +546,9 @@ func (r *Client) EmailReport(reportFileId string, report Report, token string) (
 	if len(text) == 0 {
 		text = helper.GetEnv("EMAIL_TEXT", "Report attached to this email")
 	}
-	email := SendRequest{
+	email := models.SendRequest{
 		Bcc: report.EmailReceivers,
-		From: FromTo{
+		From: models.FromTo{
 			Email: helper.GetEnv("EMAIL_FROM", ""),
 		},
 		Attachments: []struct {
@@ -585,7 +586,7 @@ func (r *Client) EmailReport(reportFileId string, report Report, token string) (
 	return true, nil
 }
 
-func calculateNextSchedule(r Report) (t *time.Time, err error) {
+func calculateNextSchedule(r models.Report) (t *time.Time, err error) {
 	if len(r.Cron) == 0 {
 		return nil, nil
 	}

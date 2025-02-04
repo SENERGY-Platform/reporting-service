@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package report_engine
+package models
 
 import (
 	"bytes"
@@ -63,6 +63,8 @@ type QueryOptions struct {
 	RollingEndDate   string `json:"rollingEndDate,omitempty"`
 	StartOffset      int    `json:"startOffset,omitempty"`
 	EndOffset        int    `json:"endOffset,omitempty"`
+	ResultObject     string `json:"resultObject,omitempty"`
+	ResultKey        int    `json:"resultKey,omitempty"`
 }
 
 type Report struct {

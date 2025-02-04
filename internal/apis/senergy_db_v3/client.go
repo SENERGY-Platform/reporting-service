@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/SENERGY-Platform/report-service/internal/models"
 	timescaleModels "github.com/SENERGY-Platform/timescale-wrapper/pkg/model"
 	"github.com/go-resty/resty/v2"
 	"net/http"
@@ -38,7 +39,7 @@ func NewClient(url string, port string) *Client {
 	return &Client{Url: url, Port: port, BaseUrl: fmt.Sprintf("%v:%v", url, port), HttpClient: client}
 }
 
-func (s *Client) Query(authTokenString string, query timescaleModels.QueriesRequestElement) (data []interface{}, err error) {
+func (s *Client) Query(authTokenString string, query timescaleModels.QueriesRequestElement, queryOptions models.QueryOptions) (data []interface{}, err error) {
 	if !query.Valid() {
 		return data, errors.New("request not valid")
 	}
@@ -59,7 +60,14 @@ func (s *Client) Query(authTokenString string, query timescaleModels.QueriesRequ
 		return
 	}
 	for _, value := range resp[0] {
-		data = append(data, value[1])
+		switch queryOptions.ResultObject {
+		case "key":
+			data = append(data, value[queryOptions.ResultKey])
+		case "object":
+			data = append(data, value)
+		default:
+			data = append(data, value[1])
+		}
 	}
 	slices.Reverse(data)
 	return data, err

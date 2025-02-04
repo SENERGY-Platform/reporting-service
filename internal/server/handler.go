@@ -18,6 +18,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/SENERGY-Platform/report-service/internal/models"
 	"log"
 	"net/http"
 	"strconv"
@@ -79,7 +80,7 @@ func startAPI(reportingClient *report_engine.Client) {
 	})
 
 	r.POST("/report/create", func(c *gin.Context) {
-		var request report_engine.Report
+		var request models.Report
 		authString := c.GetHeader("Authorization")
 		if err := c.ShouldBindJSON(&request); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -97,7 +98,7 @@ func startAPI(reportingClient *report_engine.Client) {
 	})
 
 	r.POST("/report", func(c *gin.Context) {
-		var request report_engine.Report
+		var request models.Report
 		authString := c.GetHeader("Authorization")
 		if err := c.ShouldBindJSON(&request); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -113,7 +114,7 @@ func startAPI(reportingClient *report_engine.Client) {
 	})
 
 	r.PUT("/report", func(c *gin.Context) {
-		var request report_engine.Report
+		var request models.Report
 		authString := c.GetHeader("Authorization")
 		if err := c.ShouldBindJSON(&request); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
