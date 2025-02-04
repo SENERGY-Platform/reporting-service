@@ -83,6 +83,7 @@ func startAPI(reportingClient *report_engine.Client) {
 		var request models.Report
 		authString := c.GetHeader("Authorization")
 		if err := c.ShouldBindJSON(&request); err != nil {
+			log.Println(err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -101,6 +102,7 @@ func startAPI(reportingClient *report_engine.Client) {
 		var request models.Report
 		authString := c.GetHeader("Authorization")
 		if err := c.ShouldBindJSON(&request); err != nil {
+			log.Println(err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -117,6 +119,7 @@ func startAPI(reportingClient *report_engine.Client) {
 		var request models.Report
 		authString := c.GetHeader("Authorization")
 		if err := c.ShouldBindJSON(&request); err != nil {
+			log.Println(err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
