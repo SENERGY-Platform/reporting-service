@@ -46,7 +46,7 @@ func (s *Client) Query(authTokenString string, query timescaleModels.QueriesRequ
 	response, err := s.HttpClient.R().
 		SetHeader("Authorization", authTokenString).
 		SetBody([]timescaleModels.QueriesRequestElement{query}).
-		Post(s.BaseUrl + "/db/v3/queries")
+		Post(s.BaseUrl + "/db/v3/queries/v2")
 	if err != nil {
 		return
 	}
