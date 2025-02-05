@@ -142,10 +142,10 @@ func (r *Client) setReportFileData(data map[string]models.ReportObject, authToke
 					return
 				}
 				responseData, err = r.DBClient.Query(authToken, *value.Query, *value.QueryOptions)
-				responseData = r.filterQueryValues(responseData)
 				if err != nil {
 					return
 				}
+				responseData = r.filterQueryValues(responseData)
 				if len(responseData) > 0 {
 					resultData[key] = responseData[0]
 				}
@@ -154,18 +154,19 @@ func (r *Client) setReportFileData(data map[string]models.ReportObject, authToke
 			}
 		case "object":
 			resultData[key], err = r.setReportFileData(value.Fields, authToken)
-			if len(resultData[key].(map[string]interface{})) == 0 {
-				delete(resultData, key)
-			}
 			if err != nil {
 				return
+			}
+			if len(resultData[key].(map[string]interface{})) == 0 {
+				delete(resultData, key)
 			}
 		case "array":
 			if value.Value != nil {
 				resultData[key] = value.Value
 			} else if len(value.Children) > 0 {
-				arrayData, e := r.setReportFileData(value.Children, authToken)
-				if e != nil {
+				var arrayData map[string]interface{}
+				arrayData, err = r.setReportFileData(value.Children, authToken)
+				if err != nil {
 					return
 				}
 				// convert map[string]interface{} to []interface{}
@@ -184,10 +185,10 @@ func (r *Client) setReportFileData(data map[string]models.ReportObject, authToke
 					return nil, err
 				}
 				responseData, err = r.DBClient.Query(authToken, *value.Query, *value.QueryOptions)
-				responseData = r.filterQueryValues(responseData)
 				if err != nil {
 					return
 				}
+				responseData = r.filterQueryValues(responseData)
 				resultData[key] = responseData
 			}
 		}

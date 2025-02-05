@@ -51,13 +51,12 @@ func (s *Client) Query(authTokenString string, query timescaleModels.QueriesRequ
 		return
 	}
 	if response.StatusCode() != http.StatusOK {
-		err = fmt.Errorf("%v", response.String())
-		return
+		return data, errors.New("senergy_db_v3.client - response code error: " + response.String())
 	}
 	var resp [][][]interface{}
 	err = json.Unmarshal(response.Body(), &resp)
 	if err != nil {
-		return
+		return data, errors.New("senergy_db_v3.client - response unmarshal error: " + err.Error())
 	}
 	for _, value := range resp[0] {
 		switch queryOptions.ResultObject {
