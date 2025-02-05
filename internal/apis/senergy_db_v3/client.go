@@ -24,7 +24,6 @@ import (
 	timescaleModels "github.com/SENERGY-Platform/timescale-wrapper/pkg/model"
 	"github.com/go-resty/resty/v2"
 	"net/http"
-	"slices"
 )
 
 type Client struct {
@@ -53,12 +52,12 @@ func (s *Client) Query(authTokenString string, query timescaleModels.QueriesRequ
 	if response.StatusCode() != http.StatusOK {
 		return data, errors.New("senergy_db_v3.client - response code error: " + response.String())
 	}
-	var resp [][][]interface{}
+	var resp []timescaleModels.QueriesV2ResponseElement
 	err = json.Unmarshal(response.Body(), &resp)
 	if err != nil {
 		return data, errors.New("senergy_db_v3.client - response unmarshal error: " + err.Error())
 	}
-	for _, value := range resp[0] {
+	for _, value := range resp[0].Data[0] {
 		switch queryOptions.ResultObject {
 		case "key":
 			data = append(data, value[queryOptions.ResultKey])
@@ -68,6 +67,5 @@ func (s *Client) Query(authTokenString string, query timescaleModels.QueriesRequ
 			data = append(data, value[1])
 		}
 	}
-	slices.Reverse(data)
 	return data, err
 }
