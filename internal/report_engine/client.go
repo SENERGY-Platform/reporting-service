@@ -111,6 +111,7 @@ func (r *Client) CreateReportFile(reportRequest models.Report, authTokenString s
 
 	// add the report file model to the report model
 	reportRequest.ReportFiles = append(reportRequest.ReportFiles, models.ReportFile{Id: reportFileId, Type: reportFileType, Link: reportFileLink, CreatedAt: time.Now()})
+	reportRequest.CreatedAt = reportModel.CreatedAt
 	err = r.UpdateReportModel(reportRequest, authTokenString)
 	if err != nil {
 		return
