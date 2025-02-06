@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"github.com/SENERGY-Platform/report-service/internal/models"
 	"log"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -172,8 +173,19 @@ func (r *Client) setReportFileData(data map[string]models.ReportObject, authToke
 				}
 				// convert map[string]interface{} to []interface{}
 				var dataSlice []interface{}
-				for _, v := range arrayData {
-					dataSlice = append(dataSlice, v)
+				//order slice
+				var keys []int
+				for k := range arrayData {
+					var i int
+					i, err = strconv.Atoi(k)
+					if err != nil {
+						return
+					}
+					keys = append(keys, i)
+				}
+				sort.Ints(keys)
+				for _, k := range keys {
+					dataSlice = append(dataSlice, arrayData[strconv.Itoa(k)])
 				}
 				resultData[key] = dataSlice
 				if len(resultData[key].([]interface{})) == 0 {
