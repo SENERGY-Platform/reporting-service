@@ -222,36 +222,36 @@ func (r *Client) filterQueryValues(queryValues []interface{}) (filteredData []in
 
 func (r *Client) updateStartAndEndDate(object *models.ReportObject) (err error) {
 	if object.QueryOptions != nil {
-		if object.QueryOptions.RollingStartDate != "" {
+		if *object.QueryOptions.RollingStartDate != "" {
 			startDate, e := time.Parse(time.RFC3339, *object.Query.Time.Start)
 			if e != nil {
 				return
 			}
-			startDate = startDate.Add(time.Minute * time.Duration(-object.QueryOptions.StartOffset))
+			startDate = startDate.Add(time.Minute * time.Duration(-*object.QueryOptions.StartOffset))
 			newDate := startDate
-			switch object.QueryOptions.RollingStartDate {
+			switch *object.QueryOptions.RollingStartDate {
 			case "month":
 				newDate = time.Date(time.Now().Year(), time.Now().Month(), startDate.Day(), 0, 0, 0, 0, time.UTC)
 			case "year":
 				newDate = time.Date(time.Now().Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, time.UTC)
 			}
-			newDate = newDate.Add(time.Minute * time.Duration(object.QueryOptions.StartOffset))
+			newDate = newDate.Add(time.Minute * time.Duration(*object.QueryOptions.StartOffset))
 			*object.Query.Time.Start = newDate.Format(time.RFC3339)
 		}
-		if object.QueryOptions.RollingEndDate != "" {
+		if *object.QueryOptions.RollingEndDate != "" {
 			endDate, e := time.Parse(time.RFC3339, *object.Query.Time.End)
 			if e != nil {
 				return
 			}
-			endDate = endDate.Add(time.Minute * time.Duration(-object.QueryOptions.EndOffset))
+			endDate = endDate.Add(time.Minute * time.Duration(-*object.QueryOptions.EndOffset))
 			newDate := endDate
-			switch object.QueryOptions.RollingEndDate {
+			switch *object.QueryOptions.RollingEndDate {
 			case "month":
 				newDate = time.Date(time.Now().Year(), time.Now().Month(), endDate.Day(), 0, 0, 0, 0, time.UTC)
 			case "year":
 				newDate = time.Date(time.Now().Year(), endDate.Month(), endDate.Day(), 0, 0, 0, 0, time.UTC)
 			}
-			newDate = newDate.Add(time.Minute * time.Duration(object.QueryOptions.EndOffset))
+			newDate = newDate.Add(time.Minute * time.Duration(*object.QueryOptions.EndOffset))
 			*object.Query.Time.End = newDate.Format(time.RFC3339)
 		}
 	}

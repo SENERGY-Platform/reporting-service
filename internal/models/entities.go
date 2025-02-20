@@ -59,12 +59,12 @@ type ReportObject struct {
 }
 
 type QueryOptions struct {
-	RollingStartDate string `json:"rollingStartDate,omitempty"`
-	RollingEndDate   string `json:"rollingEndDate,omitempty"`
-	StartOffset      int    `json:"startOffset,omitempty"`
-	EndOffset        int    `json:"endOffset,omitempty"`
-	ResultObject     string `json:"resultObject,omitempty"`
-	ResultKey        int    `json:"resultKey,omitempty"`
+	RollingStartDate *string `json:"rollingStartDate,omitempty"`
+	RollingEndDate   *string `json:"rollingEndDate,omitempty"`
+	StartOffset      *int    `json:"startOffset,omitempty"`
+	EndOffset        *int    `json:"endOffset,omitempty"`
+	ResultObject     *string `json:"resultObject,omitempty"`
+	ResultKey        *int    `json:"resultKey,omitempty"`
 }
 
 type Report struct {
