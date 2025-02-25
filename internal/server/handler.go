@@ -79,6 +79,18 @@ func startAPI(reportingClient *report_engine.Client) {
 		})
 	})
 
+	r.GET("/templates/preview/:id", func(c *gin.Context) {
+		id := c.Param("id")
+		authString := c.GetHeader("Authorization")
+		content, contentType, _, err := reportingClient.GetTemplatePreviewById(id, authString)
+		if err != nil {
+			log.Println(err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		c.Data(http.StatusOK, contentType, content)
+	})
+
 	r.POST("/report/create", func(c *gin.Context) {
 		var request models.Report
 		authString := c.GetHeader("Authorization")

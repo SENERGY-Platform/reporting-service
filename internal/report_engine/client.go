@@ -78,6 +78,11 @@ func (r *Client) GetTemplateById(id string, authString string) (template models.
 	return
 }
 
+func (r *Client) GetTemplatePreviewById(id string, authString string) (content []byte, contentType string, fileTypeExtension string, err error) {
+	content, contentType, fileTypeExtension, err = r.Driver.GetTemplatePreview(id, authString)
+	return
+}
+
 // CreateReportFile creates a report file with the given ID and data.
 //
 // Parameters:

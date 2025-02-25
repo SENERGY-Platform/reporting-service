@@ -194,6 +194,19 @@ func (j *Client) GetReportContent(reportId string, authString string) (data []by
 	return response.Body(), response.Header().Get("Content-Type"), response.Header().Get("File-Extension"), err
 }
 
+func (j *Client) GetTemplatePreview(id string, authString string) (data []byte, headerContentType string, headerFileExtension string, err error) {
+	response, err := j.HttpClient.R().
+		SetHeader("Authorization", authString).
+		SetBody(map[string]interface{}{"template": map[string]interface{}{"_id": id},
+			"options": map[string]interface{}{"reports": map[string]interface{}{"save": true, "async": false},
+				"reportName": "preview"}}).
+		Post(j.BaseUrl + "/api/report")
+	if err != nil {
+		return
+	}
+	return response.Body(), response.Header().Get("Content-Type"), response.Header().Get("File-Extension"), err
+}
+
 func (j *Client) DeleteCreatedReportFile(reportId string, authString string) (err error) {
 	response, err := j.HttpClient.R().
 		SetHeader("Authorization", authString).

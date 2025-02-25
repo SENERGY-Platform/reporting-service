@@ -48,4 +48,5 @@ type ReportingDriver interface {
 	// - err: An error if the retrieval fails.
 	GetReportContent(reportId string, authString string) (data []byte, headerContentType string, headerFileExtension string, err error)
 	DeleteCreatedReportFile(reportId string, authString string) (err error)
+	GetTemplatePreview(id string, authString string) (data []byte, headerContentType string, headerFileExtension string, err error)
 }
