@@ -227,7 +227,7 @@ func (r *Client) filterQueryValues(queryValues []interface{}) (filteredData []in
 
 func (r *Client) updateStartAndEndDate(object *models.ReportObject) (err error) {
 	if object.QueryOptions != nil {
-		if *object.QueryOptions.RollingStartDate != "" {
+		if object.QueryOptions.RollingStartDate != nil {
 			startDate, e := time.Parse(time.RFC3339, *object.Query.Time.Start)
 			if e != nil {
 				return
@@ -243,7 +243,7 @@ func (r *Client) updateStartAndEndDate(object *models.ReportObject) (err error) 
 			newDate = newDate.Add(time.Minute * time.Duration(*object.QueryOptions.StartOffset))
 			*object.Query.Time.Start = newDate.Format(time.RFC3339)
 		}
-		if *object.QueryOptions.RollingEndDate != "" {
+		if object.QueryOptions.RollingEndDate != nil {
 			endDate, e := time.Parse(time.RFC3339, *object.Query.Time.End)
 			if e != nil {
 				return
