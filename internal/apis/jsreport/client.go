@@ -230,7 +230,9 @@ func (j *Client) getTemplateDataByShortId(id string, authString string) (data Da
 	response, err := j.HttpClient.R().SetHeader("Authorization", authString).Get(j.BaseUrl + "/odata/data?$filter=" + url.QueryEscape("shortid eq '"+id+"'"))
 	var resp DataResponse
 	err = json.Unmarshal(response.Body(), &resp)
-	data = resp.Data[0]
+	if len(resp.Data) > 0 {
+		data = resp.Data[0]
+	}
 	return
 }
 
