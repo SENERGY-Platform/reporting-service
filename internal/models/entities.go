@@ -54,6 +54,7 @@ type ReportObject struct {
 	Value        interface{}                            `json:"value,omitempty"`
 	Query        *timescaleModels.QueriesRequestElement `json:"query,omitempty"`
 	QueryOptions *QueryOptions                          `json:"queryOptions,omitempty"`
+	DeviceQuery  *DeviceQuery                           `json:"deviceQuery,omitempty"`
 	Fields       map[string]ReportObject                `json:"fields,omitempty"`
 	Children     map[string]ReportObject                `json:"children,omitempty"`
 }
@@ -65,6 +66,10 @@ type QueryOptions struct {
 	EndOffset        *int    `json:"endOffset,omitempty"`
 	ResultObject     *string `json:"resultObject,omitempty"`
 	ResultKey        *int    `json:"resultKey,omitempty"`
+}
+
+type DeviceQuery struct {
+	Last *string `json:"last,omitempty"`
 }
 
 type Report struct {

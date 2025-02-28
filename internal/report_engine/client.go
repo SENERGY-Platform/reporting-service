@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/SENERGY-Platform/report-service/internal/apis/senergy_devices"
 	"github.com/SENERGY-Platform/report-service/internal/models"
 	"log"
 	"sort"
@@ -38,8 +39,9 @@ import (
 )
 
 type Client struct {
-	Driver   ReportingDriver
-	DBClient *senergy_db_v3.Client
+	Driver        ReportingDriver
+	DBClient      *senergy_db_v3.Client
+	DevicesClient *senergy_devices.Client
 }
 
 // NewClient creates a new client with the given reporting driver.
@@ -54,7 +56,10 @@ func NewClient(driver ReportingDriver) *Client {
 		helper.GetEnv("SENERGY_DB_URL", "http://localhost"),
 		helper.GetEnv("SENERGY_DB_PORT", "80"),
 	)
-	return &Client{Driver: driver, DBClient: dbClient}
+	devicesClient := senergy_devices.NewClient(
+		helper.GetEnv("SENERGY_DB_URL", "http://localhost"),
+		helper.GetEnv("SENERGY_DB_PORT", "80"))
+	return &Client{Driver: driver, DBClient: dbClient, DevicesClient: devicesClient}
 }
 
 // GetTemplates retrieves a list of available report templates.
@@ -207,6 +212,10 @@ func (r *Client) setReportFileData(data map[string]models.ReportObject, authToke
 					return
 				}
 				responseData = r.filterQueryValues(responseData)
+				resultData[key] = responseData
+			} else if value.DeviceQuery != nil {
+				var responseData []interface{}
+				responseData, err = r.DevicesClient.Query(authToken, *value.DeviceQuery.Last)
 				resultData[key] = responseData
 			}
 		}

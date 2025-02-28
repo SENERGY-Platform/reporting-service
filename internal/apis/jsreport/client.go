@@ -157,7 +157,7 @@ func (j *Client) CreateReport(reportName string, templateName string, data map[s
 			"data": data}).
 		Post(j.BaseUrl + "/api/report")
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Println(err.Error())
 		return
 	}
 	if response.StatusCode() != http.StatusOK {
@@ -166,7 +166,11 @@ func (j *Client) CreateReport(reportName string, templateName string, data map[s
 		}
 		var errorResponse ErrorResponse
 		err = json.Unmarshal(response.Body(), &errorResponse)
-		return "", "", "", errors.New(errorResponse.Error.Message)
+		if err != nil {
+
+		}
+		log.Println("jsreport-api: " + errorResponse.Message + " - " + errorResponse.Error.Message)
+		return "", "", "", errors.New("something went wrong")
 	}
 	reportLink = response.Header().Get("Permanent-Link")
 	reportType = response.Header().Get("Content-Type")
