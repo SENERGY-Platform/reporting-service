@@ -42,7 +42,7 @@ import (
 )
 
 var dataPointsTSDBCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-	Name: "reporting_queried_datapoints_tsdb",
+	Name: "reporting_queried_datapoints_tsdb_total",
 	Help: "Total number of data points queried from Timescale DB for report creation",
 }, []string{"user_id", "report_id"})
 
