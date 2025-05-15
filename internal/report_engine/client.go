@@ -20,13 +20,16 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/SENERGY-Platform/report-service/internal/apis/senergy_devices"
-	"github.com/SENERGY-Platform/report-service/internal/models"
 	"log"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/SENERGY-Platform/report-service/internal/apis/senergy_devices"
+	"github.com/SENERGY-Platform/report-service/internal/models"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/SENERGY-Platform/report-service/internal/apis/senergy_db_v3"
 	"github.com/SENERGY-Platform/report-service/internal/helper"
@@ -37,6 +40,11 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
+var dataPointsTSDBCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+	Name: "reporting_queried_datapoints_tsdb",
+	Help: "Total number of data points queried from Timescale DB for report creation",
+}, []string{"user_id"})
 
 type Client struct {
 	Driver        ReportingDriver
@@ -142,6 +150,11 @@ func (r *Client) CreateReportFile(reportRequest models.Report, authTokenString s
 // - err: An error if the operation fails.
 func (r *Client) setReportFileData(data map[string]models.ReportObject, authToken string) (resultData map[string]interface{}, err error) {
 	resultData = make(map[string]interface{}, len(data))
+	claims, err := jwt.Parse(authToken)
+	if err != nil {
+		return
+	}
+	userId := claims.GetUserId()
 	for key, value := range data {
 		switch value.ValueType {
 		case "string", "int", "float", "float64":
@@ -157,6 +170,7 @@ func (r *Client) setReportFileData(data map[string]models.ReportObject, authToke
 				if err != nil {
 					return
 				}
+				dataPointsTSDBCounter.WithLabelValues(userId).Add(float64(len(responseData)))
 				responseData = r.filterQueryValues(responseData)
 				if len(responseData) > 0 {
 					resultData[key] = responseData[0]
@@ -211,6 +225,7 @@ func (r *Client) setReportFileData(data map[string]models.ReportObject, authToke
 				if err != nil {
 					return
 				}
+				dataPointsTSDBCounter.WithLabelValues(userId).Add(float64(len(responseData)))
 				responseData = r.filterQueryValues(responseData)
 				resultData[key] = responseData
 			} else if value.DeviceQuery != nil {
@@ -236,7 +251,7 @@ func (r *Client) filterQueryValues(queryValues []interface{}) (filteredData []in
 
 func (r *Client) updateStartAndEndDate(object *models.ReportObject) (err error) {
 	if object.QueryOptions != nil {
-		if object.QueryOptions.RollingStartDate != nil {
+		if object.QueryOptions.RollingStartDate != nil && object.Query.Time.Start != nil {
 			startDate, e := time.Parse(time.RFC3339, *object.Query.Time.Start)
 			if e != nil {
 				return
@@ -252,7 +267,7 @@ func (r *Client) updateStartAndEndDate(object *models.ReportObject) (err error) 
 			newDate = newDate.Add(time.Minute * time.Duration(*object.QueryOptions.StartOffset))
 			*object.Query.Time.Start = newDate.Format(time.RFC3339)
 		}
-		if object.QueryOptions.RollingEndDate != nil {
+		if object.QueryOptions.RollingEndDate != nil && object.Query.Time.End != nil {
 			endDate, e := time.Parse(time.RFC3339, *object.Query.Time.End)
 			if e != nil {
 				return

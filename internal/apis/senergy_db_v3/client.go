@@ -20,10 +20,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+
 	"github.com/SENERGY-Platform/report-service/internal/models"
 	timescaleModels "github.com/SENERGY-Platform/timescale-wrapper/pkg/model"
 	"github.com/go-resty/resty/v2"
-	"net/http"
 )
 
 type Client struct {
@@ -58,13 +59,18 @@ func (s *Client) Query(authTokenString string, query timescaleModels.QueriesRequ
 		return data, errors.New("senergy_db_v3.client - response unmarshal error: " + err.Error())
 	}
 	for _, value := range resp[0].Data[0] {
-		switch *queryOptions.ResultObject {
-		case "key":
-			data = append(data, value[*queryOptions.ResultKey])
-		case "array":
-			data = append(data, value)
-		default:
+		if queryOptions.ResultObject != nil {
+			switch *queryOptions.ResultObject {
+			case "key":
+				data = append(data, value[*queryOptions.ResultKey])
+			case "array":
+				data = append(data, value)
+			default:
+				data = append(data, value[1])
+			}
+		} else {
 			data = append(data, value[1])
+
 		}
 	}
 	return data, err

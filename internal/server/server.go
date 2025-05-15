@@ -18,10 +18,12 @@ package server
 
 import (
 	"log"
+	"net/http"
 
 	"github.com/SENERGY-Platform/report-service/internal/apis/jsreport"
 	"github.com/SENERGY-Platform/report-service/internal/helper"
 	"github.com/SENERGY-Platform/report-service/internal/report_engine"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func Start() {
@@ -33,6 +35,11 @@ func Start() {
 		if err != nil {
 			log.Fatal("ERROR: " + err.Error())
 		}
+	}()
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		log.Println("INFO: Starting prometheus metrics on :2112/metrics")
+		log.Println("WARNING: Metrics server exited: " + http.ListenAndServe(":2112", nil).Error())
 	}()
 	report_engine.InitDB()
 	defer report_engine.CloseDB()
