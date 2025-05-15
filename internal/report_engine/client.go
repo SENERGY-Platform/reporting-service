@@ -44,7 +44,7 @@ import (
 var dataPointsTSDBCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 	Name: "reporting_queried_datapoints_tsdb",
 	Help: "Total number of data points queried from Timescale DB for report creation",
-}, []string{"user_id"})
+}, []string{"user_id", "report_id"})
 
 type Client struct {
 	Driver        ReportingDriver
@@ -117,7 +117,7 @@ func (r *Client) CreateReportFile(reportRequest models.Report, authTokenString s
 	reportRequest.ReportFiles = reportModel.ReportFiles
 
 	// set report file data
-	reportData, err := r.setReportFileData(reportRequest.Data, authTokenString)
+	reportData, err := r.setReportFileData(reportRequest.Data, authTokenString, reportRequest.Id)
 	if err != nil {
 		return
 	}
@@ -148,7 +148,7 @@ func (r *Client) CreateReportFile(reportRequest models.Report, authTokenString s
 // Returns:
 // - resultData: A map of interface{} containing the processed report data.
 // - err: An error if the operation fails.
-func (r *Client) setReportFileData(data map[string]models.ReportObject, authToken string) (resultData map[string]interface{}, err error) {
+func (r *Client) setReportFileData(data map[string]models.ReportObject, authToken string, reportId string) (resultData map[string]interface{}, err error) {
 	resultData = make(map[string]interface{}, len(data))
 	claims, err := jwt.Parse(authToken)
 	if err != nil {
@@ -170,7 +170,7 @@ func (r *Client) setReportFileData(data map[string]models.ReportObject, authToke
 				if err != nil {
 					return
 				}
-				dataPointsTSDBCounter.WithLabelValues(userId).Add(float64(len(responseData)))
+				dataPointsTSDBCounter.WithLabelValues(userId, reportId).Add(float64(len(responseData)))
 				responseData = r.filterQueryValues(responseData)
 				if len(responseData) > 0 {
 					resultData[key] = responseData[0]
@@ -179,7 +179,7 @@ func (r *Client) setReportFileData(data map[string]models.ReportObject, authToke
 				delete(resultData, key)
 			}
 		case "object":
-			resultData[key], err = r.setReportFileData(value.Fields, authToken)
+			resultData[key], err = r.setReportFileData(value.Fields, authToken, reportId)
 			if err != nil {
 				return
 			}
@@ -191,7 +191,7 @@ func (r *Client) setReportFileData(data map[string]models.ReportObject, authToke
 				resultData[key] = value.Value
 			} else if len(value.Children) > 0 {
 				var arrayData map[string]interface{}
-				arrayData, err = r.setReportFileData(value.Children, authToken)
+				arrayData, err = r.setReportFileData(value.Children, authToken, reportId)
 				if err != nil {
 					return
 				}
@@ -225,7 +225,7 @@ func (r *Client) setReportFileData(data map[string]models.ReportObject, authToke
 				if err != nil {
 					return
 				}
-				dataPointsTSDBCounter.WithLabelValues(userId).Add(float64(len(responseData)))
+				dataPointsTSDBCounter.WithLabelValues(userId, reportId).Add(float64(len(responseData)))
 				responseData = r.filterQueryValues(responseData)
 				resultData[key] = responseData
 			} else if value.DeviceQuery != nil {
