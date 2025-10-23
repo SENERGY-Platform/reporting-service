@@ -16,11 +16,11 @@
 
 package report_engine
 
-import "github.com/SENERGY-Platform/reporting-service/pkg/models"
+import "github.com/SENERGY-Platform/reporting-service/lib"
 
 type ReportingDriver interface {
-	GetTemplates(string) ([]models.Template, error)
-	GetTemplateById(string, string) (models.Template, error)
+	GetTemplates(string) ([]lib.Template, error)
+	GetTemplateById(string, string) (lib.Template, error)
 	// CreateReport creates a report with the given ID and data.
 	//
 	// Parameters:

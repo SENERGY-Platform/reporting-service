@@ -17,15 +17,23 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
+	"strconv"
+	"sync"
+	"syscall"
+	"time"
 
 	"github.com/SENERGY-Platform/go-service-base/srv-info-hdl"
+	"github.com/SENERGY-Platform/go-service-base/struct-logger/attributes"
 	sb_util "github.com/SENERGY-Platform/go-service-base/util"
+	"github.com/SENERGY-Platform/reporting-service/pkg/api"
 	"github.com/SENERGY-Platform/reporting-service/pkg/apis/jsreport"
 	"github.com/SENERGY-Platform/reporting-service/pkg/config"
 	"github.com/SENERGY-Platform/reporting-service/pkg/report_engine"
-	"github.com/SENERGY-Platform/reporting-service/pkg/server"
 	"github.com/SENERGY-Platform/reporting-service/pkg/util"
 )
 
@@ -54,15 +62,74 @@ func main() {
 	util.Logger.Info("config: " + sb_util.ToJsonStr(cfg))
 
 	client := report_engine.NewClient(jsreport.NewJSReportClient(cfg.JSReport.Url, cfg.JSReport.Port), cfg)
+
+	report_engine.InitDB(cfg.MongoUrl)
+	defer report_engine.CloseDB()
+
+	httpHandler, err := api.CreateServer(cfg, client)
+	if err != nil {
+		util.Logger.Error("error creating http engine", "error", err)
+		ec = 1
+		return
+	}
+
+	bindAddress := ":" + strconv.FormatInt(int64(cfg.ServerPort), 10)
+
+	if cfg.Debug {
+		bindAddress = "127.0.0.1:" + strconv.FormatInt(int64(cfg.ServerPort), 10)
+	}
+
+	httpServer := &http.Server{
+		Addr:    bindAddress,
+		Handler: httpHandler}
+
+	ctx, cf := context.WithCancel(context.Background())
+
 	go func() {
+		util.Wait(ctx, util.Logger, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+		cf()
+	}()
+
+	wg := &sync.WaitGroup{}
+
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		util.Logger.Info("init scheduler")
 		err = client.RunScheduler()
 		if err != nil {
 			util.Logger.Error("could not start scheduler", "error", err)
 			ec = 1
 			return
 		}
+		cf()
 	}()
-	report_engine.InitDB(cfg.MongoUrl)
-	defer report_engine.CloseDB()
-	server.StartAPI(client, *cfg)
+
+	go func() {
+		defer wg.Done()
+		util.Logger.Info("starting http server")
+		if err = httpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+			util.Logger.Error("starting server failed", attributes.ErrorKey, err)
+			ec = 1
+		}
+		cf()
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		<-ctx.Done()
+		util.Logger.Info("stopping http server")
+		ctxWt, cf2 := context.WithTimeout(context.Background(), time.Second*5)
+		defer cf2()
+		if err := httpServer.Shutdown(ctxWt); err != nil {
+			util.Logger.Error("stopping server failed", attributes.ErrorKey, err)
+			ec = 1
+		} else {
+			util.Logger.Info("http server stopped")
+		}
+	}()
+
+	wg.Wait()
 }

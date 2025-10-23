@@ -3,9 +3,9 @@ package report_engine
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
+	"github.com/SENERGY-Platform/reporting-service/pkg/util"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -20,12 +20,12 @@ func InitDB(url string) {
 	if err != nil {
 		if errors.Is(CTX.Err(), context.DeadlineExceeded) {
 			// handle the case where the context was cancelled due to the timeout
-			fmt.Println("context cancelled due to timeout")
+			util.Logger.Error("context cancelled due to timeout")
 		} else {
 			panic("failed to connect database: " + err.Error())
 		}
 	} else {
-		fmt.Println("Connected to DB.")
+		util.Logger.Info("connected to database")
 	}
 	DB = client
 }

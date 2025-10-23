@@ -20,15 +20,15 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"log"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/SENERGY-Platform/reporting-service/lib"
 	"github.com/SENERGY-Platform/reporting-service/pkg/apis/senergy_devices"
 	"github.com/SENERGY-Platform/reporting-service/pkg/config"
-	"github.com/SENERGY-Platform/reporting-service/pkg/models"
+	"github.com/SENERGY-Platform/reporting-service/pkg/util"
 
 	"github.com/SENERGY-Platform/reporting-service/pkg/apis/senergy_db_v3"
 	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
@@ -73,7 +73,7 @@ func NewClient(driver ReportingDriver, config *config.Config) *Client {
 // GetTemplates retrieves a list of available report templates.
 //
 // Returns a slice of Template objects and an error if the operation fails.
-func (r *Client) GetTemplates(authTokenString string) (templates []models.Template, err error) {
+func (r *Client) GetTemplates(authTokenString string) (templates []lib.Template, err error) {
 	templates, err = r.Driver.GetTemplates(authTokenString)
 	return
 }
@@ -86,7 +86,7 @@ func (r *Client) GetTemplates(authTokenString string) (templates []models.Templa
 // Returns:
 // - template: The retrieved template.
 // - err: An error if the retrieval fails.
-func (r *Client) GetTemplateById(id string, authString string) (template models.Template, err error) {
+func (r *Client) GetTemplateById(id string, authString string) (template lib.Template, err error) {
 	template, err = r.Driver.GetTemplateById(id, authString)
 	return
 }
@@ -105,7 +105,7 @@ func (r *Client) GetTemplatePreviewById(id string, authString string) (content [
 //
 // Returns:
 // - err: An error if the operation fails.
-func (r *Client) CreateReportFile(reportRequest models.Report, authTokenString string) (resultReport models.Report, reportFileId string, err error) {
+func (r *Client) CreateReportFile(reportRequest lib.Report, authTokenString string) (resultReport lib.Report, reportFileId string, err error) {
 	reportModel, err := r.GetReportModel(reportRequest.Id, authTokenString)
 	// if no report model is found, create a new one
 	if errors.Is(err, mongo.ErrNoDocuments) || reportModel.Id == "" {
@@ -129,7 +129,7 @@ func (r *Client) CreateReportFile(reportRequest models.Report, authTokenString s
 	}
 
 	// add the report file model to the report model
-	reportRequest.ReportFiles = append(reportRequest.ReportFiles, models.ReportFile{Id: reportFileId, Type: reportFileType, Link: reportFileLink, CreatedAt: time.Now()})
+	reportRequest.ReportFiles = append(reportRequest.ReportFiles, lib.ReportFile{Id: reportFileId, Type: reportFileType, Link: reportFileLink, CreatedAt: time.Now()})
 	reportRequest.CreatedAt = reportModel.CreatedAt
 	err = r.UpdateReportModel(reportRequest, authTokenString)
 	if err != nil {
@@ -148,6 +148,7 @@ func (r *Client) CreateReportFile(reportRequest models.Report, authTokenString s
 // Returns:
 // - resultData: A map of interface{} containing the processed report data.
 // - err: An error if the operation fails.
+func (r *Client) setReportFileData(data map[string]lib.ReportObject, authToken string) (resultData map[string]interface{}, err error) {
 func (r *Client) setReportFileData(data map[string]models.ReportObject, authToken string, reportId string) (resultData map[string]interface{}, err error) {
 	resultData = make(map[string]interface{}, len(data))
 	claims, err := jwt.Parse(authToken)
@@ -249,7 +250,7 @@ func (r *Client) filterQueryValues(queryValues []interface{}) (filteredData []in
 	return
 }
 
-func (r *Client) updateStartAndEndDate(object *models.ReportObject) (err error) {
+func (r *Client) updateStartAndEndDate(object *lib.ReportObject) (err error) {
 	if object.QueryOptions != nil {
 		if object.QueryOptions.RollingStartDate != nil && object.Query.Time.Start != nil {
 			startDate, e := time.Parse(time.RFC3339, *object.Query.Time.Start)
@@ -353,7 +354,7 @@ func (r *Client) DeleteCreatedReportFile(reportId string, fileId string, authTok
 //
 // Returns:
 // - err: An error if the operation fails.
-func (r *Client) SaveReportModel(report models.Report, authTokenString string) (savedReport models.Report, err error) {
+func (r *Client) SaveReportModel(report lib.Report, authTokenString string) (savedReport lib.Report, err error) {
 	claims, err := jwt.Parse(authTokenString)
 	if err != nil {
 		return
@@ -379,7 +380,7 @@ func (r *Client) SaveReportModel(report models.Report, authTokenString string) (
 //
 // Returns:
 // - err: An error if the operation fails.
-func (r *Client) UpdateReportModel(report models.Report, authTokenString string) (err error) {
+func (r *Client) UpdateReportModel(report lib.Report, authTokenString string) (err error) {
 	claims, err := jwt.Parse(authTokenString)
 	if err != nil {
 		return
@@ -444,14 +445,14 @@ func (r *Client) DeleteReport(id string, authTokenString string, admin bool) (er
 // Returns:
 // - report: A Report struct representing the retrieved report.
 // - err: An error if the operation fails.
-func (r *Client) GetReportModel(id string, authTokenString string) (report models.Report, err error) {
+func (r *Client) GetReportModel(id string, authTokenString string) (report lib.Report, err error) {
 	claims, err := jwt.Parse(authTokenString)
 	if err != nil {
 		return
 	}
 	err = Reports().FindOne(CTX, bson.M{"_id": id, "userid": claims.GetUserId()}).Decode(&report)
 	if err != nil {
-		return models.Report{}, err
+		return lib.Report{}, err
 	}
 	return
 }
@@ -466,7 +467,7 @@ func (r *Client) GetReportModel(id string, authTokenString string) (report model
 // Returns:
 // - reports: A slice of Report structs representing the retrieved reports.
 // - err: An error if the operation fails.
-func (r *Client) GetReportModels(authTokenString string, args map[string][]string, admin bool) (reports []models.Report, err error) {
+func (r *Client) GetReportModels(authTokenString string, args map[string][]string, admin bool) (reports []lib.Report, err error) {
 	claims, err := jwt.Parse(authTokenString)
 	if err != nil {
 		return
@@ -500,15 +501,13 @@ func (r *Client) GetReportModels(authTokenString string, args map[string][]strin
 	}
 	cur, err = Reports().Find(CTX, req, opt)
 	if err != nil {
-		log.Println(err)
 		return nil, err
 	}
 	for cur.Next(CTX) {
 		// create a value into which the single document can be decoded
-		var elem models.Report
-		err := cur.Decode(&elem)
+		var elem lib.Report
+		err = cur.Decode(&elem)
 		if err != nil {
-			log.Fatal(err)
 			return nil, err
 		}
 		reports = append(reports, elem)
@@ -531,17 +530,18 @@ func (r *Client) RunScheduler() error {
 	ticker := time.NewTicker(tickerDur)
 	for {
 		<-ticker.C
+		util.Logger.Debug("running scheduler")
 		cur, err := Reports().Find(CTX, bson.M{"scheduledfor": bson.M{"$lt": time.Now()}})
 		if err != nil {
 			return err
 		}
 		for cur.Next(CTX) {
-			var report models.Report
+			var report lib.Report
 			err := cur.Decode(&report)
 			if err != nil {
 				return err
 			}
-			log.Println("Creating scheduled report file for " + report.Id)
+			util.Logger.Info("creating scheduled report file for " + report.Id)
 			token, _, err := jwt.ExchangeUserToken(
 				r.Config.Keycloak.Url,
 				r.Config.Keycloak.ClientId,
@@ -573,7 +573,7 @@ func (r *Client) RunScheduler() error {
 // Returns:
 // - sent: true if an email has been sent, false otherwise
 // - err: An error if the operation fails.
-func (r *Client) EmailReport(reportFileId string, report models.Report, token string) (sent bool, err error) {
+func (r *Client) EmailReport(reportFileId string, report lib.Report, token string) (sent bool, err error) {
 	if len(report.EmailReceivers) == 0 {
 		return false, nil
 	}
@@ -589,9 +589,9 @@ func (r *Client) EmailReport(reportFileId string, report models.Report, token st
 	if len(text) == 0 {
 		text = r.Config.Mail.Text
 	}
-	email := models.SendRequest{
+	email := lib.SendRequest{
 		Bcc: report.EmailReceivers,
-		From: models.FromTo{
+		From: lib.FromTo{
 			Email: r.Config.Mail.From,
 		},
 		Attachments: []struct {
@@ -629,7 +629,7 @@ func (r *Client) EmailReport(reportFileId string, report models.Report, token st
 	return true, nil
 }
 
-func calculateNextSchedule(r models.Report) (t *time.Time, err error) {
+func calculateNextSchedule(r lib.Report) (t *time.Time, err error) {
 	if len(r.Cron) == 0 {
 		return nil, nil
 	}

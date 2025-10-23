@@ -1,0 +1,712 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "For the administration of reports.",
+        "title": "Reporting-Service API",
+        "contact": {},
+        "license": {
+            "name": "Apache-2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        },
+        "version": "0.0.42"
+    },
+    "basePath": "/",
+    "paths": {
+        "/report": {
+            "get": {
+                "description": "Gets all reports",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Report"
+                ],
+                "summary": "Get all reports",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/lib.Report"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "Updates report model",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Report"
+                ],
+                "summary": "Update report model",
+                "parameters": [
+                    {
+                        "description": "Report",
+                        "name": "report",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/lib.Report"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Creates report model",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Report"
+                ],
+                "summary": "Create report model",
+                "parameters": [
+                    {
+                        "description": "Report",
+                        "name": "report",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/lib.Report"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/report/:id": {
+            "get": {
+                "description": "Gets report by id",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Report"
+                ],
+                "summary": "Get report by id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Report ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/lib.Report"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Deletes report by id",
+                "tags": [
+                    "Report"
+                ],
+                "summary": "Delete report by id",
+                "responses": {
+                    "204": {
+                        "description": "No Content",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/report/create": {
+            "post": {
+                "description": "Creates report file",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Report"
+                ],
+                "summary": "Create report file",
+                "parameters": [
+                    {
+                        "description": "Report",
+                        "name": "report",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/lib.Report"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/report/file/:reportId/:fileId": {
+            "get": {
+                "description": "Gets report file by id",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Report"
+                ],
+                "summary": "Get report file by id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Report ID",
+                        "name": "reportId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "File ID",
+                        "name": "fileId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Deletes report file by id",
+                "tags": [
+                    "Report"
+                ],
+                "summary": "Delete report file by id",
+                "responses": {
+                    "204": {
+                        "description": "No Content",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/templates": {
+            "get": {
+                "description": "Gets all templates",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Template"
+                ],
+                "summary": "Get all templates",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/lib.Template"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/templates/:id": {
+            "get": {
+                "description": "Gets template by id",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Template"
+                ],
+                "summary": "Get template by id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Template ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/lib.Template"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/templates/preview/:id": {
+            "get": {
+                "description": "Gets template preview by id",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Template"
+                ],
+                "summary": "Get template preview by id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Template ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "lib.Data": {
+            "type": "object",
+            "properties": {
+                "dataJsonString": {
+                    "type": "string"
+                },
+                "dataStructured": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/lib.DataType"
+                    }
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "lib.DataType": {
+            "type": "object",
+            "properties": {
+                "children": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/lib.DataType"
+                    }
+                },
+                "fields": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/lib.DataType"
+                    }
+                },
+                "length": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "valueType": {
+                    "type": "string"
+                }
+            }
+        },
+        "lib.DeviceQuery": {
+            "type": "object",
+            "properties": {
+                "last": {
+                    "type": "string"
+                }
+            }
+        },
+        "lib.QueryOptions": {
+            "type": "object",
+            "properties": {
+                "endOffset": {
+                    "type": "integer"
+                },
+                "resultKey": {
+                    "type": "integer"
+                },
+                "resultObject": {
+                    "type": "string"
+                },
+                "rollingEndDate": {
+                    "type": "string"
+                },
+                "rollingStartDate": {
+                    "type": "string"
+                },
+                "startOffset": {
+                    "type": "integer"
+                }
+            }
+        },
+        "lib.Report": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "cron": {
+                    "type": "string"
+                },
+                "data": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/lib.ReportObject"
+                    }
+                },
+                "emailHTML": {
+                    "type": "string"
+                },
+                "emailReceivers": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "emailSubject": {
+                    "type": "string"
+                },
+                "emailText": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "reportFiles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/lib.ReportFile"
+                    }
+                },
+                "templateId": {
+                    "type": "string"
+                },
+                "templateName": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                },
+                "userId": {
+                    "type": "string"
+                }
+            }
+        },
+        "lib.ReportFile": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "lib.ReportObject": {
+            "type": "object",
+            "properties": {
+                "children": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/lib.ReportObject"
+                    }
+                },
+                "deviceQuery": {
+                    "$ref": "#/definitions/lib.DeviceQuery"
+                },
+                "fields": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/lib.ReportObject"
+                    }
+                },
+                "length": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "query": {
+                    "$ref": "#/definitions/model.QueriesRequestElement"
+                },
+                "queryOptions": {
+                    "$ref": "#/definitions/lib.QueryOptions"
+                },
+                "value": {},
+                "valueType": {
+                    "type": "string"
+                }
+            }
+        },
+        "lib.Template": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/lib.Data"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.Direction": {
+            "type": "string",
+            "enum": [
+                "asc",
+                "desc"
+            ],
+            "x-enum-varnames": [
+                "Asc",
+                "Desc"
+            ]
+        },
+        "model.QueriesRequestElement": {
+            "type": "object",
+            "properties": {
+                "columns": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.QueriesRequestElementColumn"
+                    }
+                },
+                "deviceGroupId": {
+                    "type": "string"
+                },
+                "deviceId": {
+                    "type": "string"
+                },
+                "exportId": {
+                    "type": "string"
+                },
+                "filters": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.QueriesRequestElementFilter"
+                    }
+                },
+                "groupTime": {
+                    "type": "string"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "locationId": {
+                    "type": "string"
+                },
+                "orderColumnIndex": {
+                    "type": "integer"
+                },
+                "orderDirection": {
+                    "$ref": "#/definitions/model.Direction"
+                },
+                "serviceId": {
+                    "type": "string"
+                },
+                "time": {
+                    "$ref": "#/definitions/model.QueriesRequestElementTime"
+                }
+            }
+        },
+        "model.QueriesRequestElementColumn": {
+            "type": "object",
+            "properties": {
+                "conceptId": {
+                    "type": "string"
+                },
+                "criteria": {
+                    "$ref": "#/definitions/models.DeviceGroupFilterCriteria"
+                },
+                "groupType": {
+                    "type": "string"
+                },
+                "math": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "sourceCharacteristicId": {
+                    "type": "string"
+                },
+                "targetCharacteristicId": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.QueriesRequestElementFilter": {
+            "type": "object",
+            "properties": {
+                "column": {
+                    "type": "string"
+                },
+                "math": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "value": {}
+            }
+        },
+        "model.QueriesRequestElementTime": {
+            "type": "object",
+            "properties": {
+                "ahead": {
+                    "type": "string"
+                },
+                "end": {
+                    "type": "string"
+                },
+                "last": {
+                    "type": "string"
+                },
+                "start": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.DeviceGroupFilterCriteria": {
+            "type": "object",
+            "properties": {
+                "aspect_id": {
+                    "type": "string"
+                },
+                "device_class_id": {
+                    "type": "string"
+                },
+                "function_id": {
+                    "type": "string"
+                },
+                "interaction": {
+                    "$ref": "#/definitions/models.Interaction"
+                }
+            }
+        },
+        "models.Interaction": {
+            "type": "string",
+            "enum": [
+                "event",
+                "request",
+                "event+request"
+            ],
+            "x-enum-varnames": [
+                "EVENT",
+                "REQUEST",
+                "EVENT_AND_REQUEST"
+            ]
+        }
+    }
+}

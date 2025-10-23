@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/SENERGY-Platform/reporting-service/pkg/models"
+	"github.com/SENERGY-Platform/reporting-service/lib"
 	timescaleModels "github.com/SENERGY-Platform/timescale-wrapper/pkg/model"
 	"github.com/go-resty/resty/v2"
 )
@@ -39,7 +39,7 @@ func NewClient(url string, port int64) *Client {
 	return &Client{Url: url, Port: port, BaseUrl: fmt.Sprintf("%v:%v", url, port), HttpClient: client}
 }
 
-func (s *Client) Query(authTokenString string, query timescaleModels.QueriesRequestElement, queryOptions models.QueryOptions) (data []interface{}, err error) {
+func (s *Client) Query(authTokenString string, query timescaleModels.QueriesRequestElement, queryOptions lib.QueryOptions) (data []interface{}, err error) {
 	if !query.Valid() {
 		return data, errors.New("request not valid")
 	}

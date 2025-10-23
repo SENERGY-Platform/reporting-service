@@ -20,13 +20,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"reflect"
 	"strconv"
 
-	"github.com/SENERGY-Platform/reporting-service/pkg/models"
+	"github.com/SENERGY-Platform/reporting-service/lib"
 )
 import "github.com/go-resty/resty/v2"
 
@@ -48,7 +47,7 @@ func NewJSReportClient(url string, port int64) *Client {
 	return &Client{Url: url, Port: port, BaseUrl: fmt.Sprintf("%v:%v", url, port), HttpClient: client}
 }
 
-func (j *Client) GetTemplates(authString string) (templates []models.Template, err error) {
+func (j *Client) GetTemplates(authString string) (templates []lib.Template, err error) {
 	response, err := j.HttpClient.R().SetHeader("Authorization", authString).Get(j.BaseUrl + "/odata/templates?$select=name,recipe")
 	if err != nil {
 		return
@@ -59,7 +58,7 @@ func (j *Client) GetTemplates(authString string) (templates []models.Template, e
 		return
 	}
 	for _, jsTemplate := range resp.Templates {
-		templates = append(templates, models.Template{
+		templates = append(templates, lib.Template{
 			Id:   jsTemplate.Id,
 			Name: jsTemplate.Name,
 			Type: TypeMap[jsTemplate.Recipe],
@@ -68,7 +67,7 @@ func (j *Client) GetTemplates(authString string) (templates []models.Template, e
 	return
 }
 
-func (j *Client) GetTemplateById(templateId string, authString string) (template models.Template, err error) {
+func (j *Client) GetTemplateById(templateId string, authString string) (template lib.Template, err error) {
 	response, err := j.HttpClient.R().SetHeader("Authorization", authString).Get(j.BaseUrl + "/odata/templates('" + templateId + "')")
 	var resp Template
 	err = json.Unmarshal(response.Body(), &resp)
@@ -94,16 +93,16 @@ func (j *Client) GetTemplateById(templateId string, authString string) (template
 	return
 }
 
-func getJsonKeysAndTypes(jsonData map[string]interface{}) (result map[string]models.DataType) {
-	result = make(map[string]models.DataType)
+func getJsonKeysAndTypes(jsonData map[string]interface{}) (result map[string]lib.DataType) {
+	result = make(map[string]lib.DataType)
 
 	for key, value := range jsonData {
 		if _, ok := result[key]; !ok {
-			result[key] = models.DataType{}
+			result[key] = lib.DataType{}
 		}
 
 		if mapValue, ok := value.(map[string]interface{}); ok { // map
-			result[key] = models.DataType{
+			result[key] = lib.DataType{
 				Name:      key,
 				ValueType: "object",
 				Fields:    getJsonKeysAndTypes(mapValue),
@@ -114,14 +113,14 @@ func getJsonKeysAndTypes(jsonData map[string]interface{}) (result map[string]mod
 				childrenMap[strconv.Itoa(i)] = arrayValue[i]
 			}
 			children := getJsonKeysAndTypes(childrenMap)
-			result[key] = models.DataType{
+			result[key] = lib.DataType{
 				Name:      key,
 				ValueType: "array",
 				Length:    len(arrayValue),
 				Children:  children,
 			}
 		} else {
-			result[key] = models.DataType{
+			result[key] = lib.DataType{
 				Name:      key,
 				ValueType: fmt.Sprintf("%v", reflect.TypeOf(value)),
 			}
@@ -158,7 +157,6 @@ func (j *Client) CreateReport(reportName string, templateName string, data map[s
 			"data": data}).
 		Post(j.BaseUrl + "/api/report")
 	if err != nil {
-		log.Println(err.Error())
 		return
 	}
 	if response.StatusCode() != http.StatusOK {
@@ -168,10 +166,9 @@ func (j *Client) CreateReport(reportName string, templateName string, data map[s
 		var errorResponse ErrorResponse
 		err = json.Unmarshal(response.Body(), &errorResponse)
 		if err != nil {
-
+			return
 		}
-		log.Println("jsreport-api: " + errorResponse.Message + " - " + errorResponse.Error.Message)
-		return "", "", "", errors.New("something went wrong")
+		return "", "", "", errors.New("jsreport-api: " + errorResponse.Message + " - " + errorResponse.Error.Message)
 	}
 	reportLink = response.Header().Get("Permanent-Link")
 	reportType = response.Header().Get("Content-Type")
@@ -217,7 +214,6 @@ func (j *Client) DeleteCreatedReportFile(reportId string, authString string) (er
 		SetHeader("Authorization", authString).
 		Delete(j.BaseUrl + "/odata/reports('" + reportId + "')")
 	if err != nil {
-		log.Println(err.Error())
 		return
 	}
 	if response.StatusCode() != http.StatusNoContent {
