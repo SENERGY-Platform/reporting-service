@@ -20,12 +20,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/SENERGY-Platform/report-service/internal/models"
 	"log"
 	"net/http"
 	"net/url"
 	"reflect"
 	"strconv"
+
+	"github.com/SENERGY-Platform/report-service/pkg/models"
 )
 import "github.com/go-resty/resty/v2"
 

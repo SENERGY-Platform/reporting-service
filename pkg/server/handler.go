@@ -18,13 +18,14 @@ package server
 
 import (
 	"fmt"
-	"github.com/SENERGY-Platform/report-service/internal/models"
 	"log"
 	"net/http"
 	"strconv"
 
-	"github.com/SENERGY-Platform/report-service/internal/helper"
-	"github.com/SENERGY-Platform/report-service/internal/report_engine"
+	"github.com/SENERGY-Platform/report-service/pkg/models"
+
+	"github.com/SENERGY-Platform/report-service/pkg/helper"
+	"github.com/SENERGY-Platform/report-service/pkg/report_engine"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"

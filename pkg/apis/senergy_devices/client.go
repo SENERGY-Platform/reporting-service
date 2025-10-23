@@ -20,8 +20,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/go-resty/resty/v2"
 	"net/http"
+
+	"github.com/go-resty/resty/v2"
 )
 
 type Client struct {

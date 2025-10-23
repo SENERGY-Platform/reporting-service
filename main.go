@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 InfAI (CC SES)
+ * Copyright 2025 InfAI (CC SES)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,10 @@
 package main
 
 import (
-	"github.com/SENERGY-Platform/report-service/internal/server"
-	"github.com/joho/godotenv"
 	"log"
+
+	"github.com/SENERGY-Platform/report-service/pkg/server"
+	"github.com/joho/godotenv"
 )
 
 func main() {

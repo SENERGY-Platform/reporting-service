@@ -26,13 +26,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SENERGY-Platform/report-service/internal/apis/senergy_devices"
-	"github.com/SENERGY-Platform/report-service/internal/models"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/SENERGY-Platform/report-service/pkg/apis/senergy_devices"
+	"github.com/SENERGY-Platform/report-service/pkg/models"
 
-	"github.com/SENERGY-Platform/report-service/internal/apis/senergy_db_v3"
-	"github.com/SENERGY-Platform/report-service/internal/helper"
+	"github.com/SENERGY-Platform/report-service/pkg/apis/senergy_db_v3"
+	"github.com/SENERGY-Platform/report-service/pkg/helper"
 	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
 	"github.com/globalsign/mgo/bson"
 	"github.com/google/uuid"
