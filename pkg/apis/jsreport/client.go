@@ -32,7 +32,7 @@ import "github.com/go-resty/resty/v2"
 
 type Client struct {
 	Url        string
-	Port       string
+	Port       int64
 	BaseUrl    string
 	HttpClient *resty.Client
 }
@@ -43,7 +43,7 @@ var TypeMap = map[string]string{
 	"html-to-xlsx": "Excel",
 }
 
-func NewJSReportClient(url string, port string) *Client {
+func NewJSReportClient(url string, port int64) *Client {
 	client := resty.New()
 	return &Client{Url: url, Port: port, BaseUrl: fmt.Sprintf("%v:%v", url, port), HttpClient: client}
 }

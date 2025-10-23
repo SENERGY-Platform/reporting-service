@@ -26,12 +26,12 @@ type LoggerConfig struct {
 
 type JSReportConfig struct {
 	Url  string `json:"url" env_var:"JSREPORT_SERVER_URL"`
-	Port string `json:"port" env_var:"JSREPORT_SERVER_PORT"`
+	Port int64  `json:"port" env_var:"JSREPORT_SERVER_PORT"`
 }
 
 type SNRGYConfig struct {
 	Url  string `json:"url" env_var:"SENERGY_DB_URL"`
-	Port string `json:"port" env_var:"SENERGY_DB_PORT"`
+	Port int64  `json:"port" env_var:"SENERGY_DB_PORT"`
 }
 
 type KeycloakConfig struct {
@@ -66,11 +66,11 @@ func New(path string) (*Config, error) {
 		Debug:      false,
 		JSReport: JSReportConfig{
 			Url:  "http://localhost",
-			Port: "5488",
+			Port: 5488,
 		},
 		SNRGY: SNRGYConfig{
 			Url:  "http://localhost",
-			Port: "80",
+			Port: 80,
 		},
 		Keycloak: KeycloakConfig{
 			Url:          "http://localhost",

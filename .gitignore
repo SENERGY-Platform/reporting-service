@@ -26,3 +26,5 @@ docker/
 .env
 .vscode
 __debug*
+
+config.json

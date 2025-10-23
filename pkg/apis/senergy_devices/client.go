@@ -27,12 +27,12 @@ import (
 
 type Client struct {
 	Url        string
-	Port       string
+	Port       int64
 	BaseUrl    string
 	HttpClient *resty.Client
 }
 
-func NewClient(url string, port string) *Client {
+func NewClient(url string, port int64) *Client {
 	client := resty.New()
 	return &Client{Url: url, Port: port, BaseUrl: fmt.Sprintf("%v:%v", url, port), HttpClient: client}
 }
