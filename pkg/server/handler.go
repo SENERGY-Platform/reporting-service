@@ -20,24 +20,18 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 
-	"github.com/SENERGY-Platform/report-service/pkg/models"
+	"github.com/SENERGY-Platform/reporting-service/pkg/config"
+	"github.com/SENERGY-Platform/reporting-service/pkg/models"
 
-	"github.com/SENERGY-Platform/report-service/pkg/helper"
-	"github.com/SENERGY-Platform/report-service/pkg/report_engine"
+	"github.com/SENERGY-Platform/reporting-service/pkg/report_engine"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
-func startAPI(reportingClient *report_engine.Client) {
-	DEBUG, err := strconv.ParseBool(helper.GetEnv("DEBUG", "false"))
-	if err != nil {
-		log.Print("Error loading debug value")
-		DEBUG = false
-	}
-	if !DEBUG {
+func StartAPI(reportingClient *report_engine.Client, cfg config.Config) {
+	if !cfg.Debug {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	r := gin.Default()
@@ -48,7 +42,7 @@ func startAPI(reportingClient *report_engine.Client) {
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 	}))
-	prefix := r.Group(helper.GetEnv("ROUTE_PREFIX", ""))
+	prefix := r.Group(cfg.URLPrefix)
 	prefix.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "pong",
@@ -211,7 +205,8 @@ func startAPI(reportingClient *report_engine.Client) {
 		c.Status(http.StatusNoContent)
 	})
 
-	if !DEBUG {
+	var err error
+	if !cfg.Debug {
 		err = r.Run()
 	} else {
 		err = r.Run("127.0.0.1:8080")

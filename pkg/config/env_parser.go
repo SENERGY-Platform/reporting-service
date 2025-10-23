@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 InfAI (CC SES)
+ * Copyright 2025 InfAI (CC SES)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,14 +14,15 @@
  * limitations under the License.
  */
 
-package helper
+package config
 
-import "os"
+import (
+	sb_config_hdl "github.com/SENERGY-Platform/go-service-base/config-hdl"
+	sb_config_env_parser "github.com/SENERGY-Platform/go-service-base/config-hdl/env_parser"
+	sb_config_types "github.com/SENERGY-Platform/go-service-base/config-hdl/types"
+)
 
-func GetEnv(key, fallback string) string {
-	value := os.Getenv(key)
-	if len(value) == 0 {
-		return fallback
-	}
-	return value
+var envTypeParser = []sb_config_hdl.EnvTypeParser{
+	sb_config_types.SecretEnvTypeParser,
+	sb_config_env_parser.DurationEnvTypeParser,
 }

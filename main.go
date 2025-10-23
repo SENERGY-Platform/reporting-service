@@ -17,16 +17,52 @@
 package main
 
 import (
-	"log"
+	"fmt"
+	"os"
 
-	"github.com/SENERGY-Platform/report-service/pkg/server"
-	"github.com/joho/godotenv"
+	"github.com/SENERGY-Platform/go-service-base/srv-info-hdl"
+	sb_util "github.com/SENERGY-Platform/go-service-base/util"
+	"github.com/SENERGY-Platform/reporting-service/pkg/apis/jsreport"
+	"github.com/SENERGY-Platform/reporting-service/pkg/config"
+	"github.com/SENERGY-Platform/reporting-service/pkg/report_engine"
+	"github.com/SENERGY-Platform/reporting-service/pkg/server"
+	"github.com/SENERGY-Platform/reporting-service/pkg/util"
 )
 
+var Version = "0.0.42"
+
 func main() {
-	err := godotenv.Load()
+	ec := 0
+	defer func() {
+		os.Exit(ec)
+	}()
+
+	srvInfoHdl := srv_info_hdl.New("reporting-service", Version)
+
+	config.ParseFlags()
+
+	cfg, err := config.New(config.ConfPath)
 	if err != nil {
-		log.Print("Error loading .env file")
+		_, _ = fmt.Fprintln(os.Stderr, err)
+		ec = 1
+		return
 	}
-	server.Start()
+
+	util.InitStructLogger(cfg.Logger.Level)
+
+	util.Logger.Info(srvInfoHdl.Name(), "version", srvInfoHdl.Version())
+	util.Logger.Info("config: " + sb_util.ToJsonStr(cfg))
+
+	client := report_engine.NewClient(jsreport.NewJSReportClient(cfg.JSReport.Url, cfg.JSReport.Port), cfg)
+	go func() {
+		err = client.RunScheduler()
+		if err != nil {
+			util.Logger.Error("could not start scheduler", "error", err)
+			ec = 1
+			return
+		}
+	}()
+	report_engine.InitDB(cfg.MongoUrl)
+	defer report_engine.CloseDB()
+	server.StartAPI(client, *cfg)
 }

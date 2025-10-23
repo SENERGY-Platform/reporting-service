@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/SENERGY-Platform/report-service/pkg/helper"
-
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -15,10 +13,10 @@ import (
 var DB *mongo.Client
 var CTX mongo.SessionContext
 
-func InitDB() {
+func InitDB(url string) {
 	CTX, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	client, err := mongo.Connect(CTX, options.Client().ApplyURI(helper.GetEnv("MONGODB_URI", "mongodb://localhost:27017")))
+	client, err := mongo.Connect(CTX, options.Client().ApplyURI(url))
 	if err != nil {
 		if errors.Is(CTX.Err(), context.DeadlineExceeded) {
 			// handle the case where the context was cancelled due to the timeout

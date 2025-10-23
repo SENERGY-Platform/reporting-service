@@ -16,7 +16,7 @@
 
 package report_engine
 
-import "github.com/SENERGY-Platform/report-service/pkg/models"
+import "github.com/SENERGY-Platform/reporting-service/pkg/models"
 
 type ReportingDriver interface {
 	GetTemplates(string) ([]models.Template, error)

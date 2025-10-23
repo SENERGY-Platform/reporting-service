@@ -1,10 +1,14 @@
-module github.com/SENERGY-Platform/report-service
+module github.com/SENERGY-Platform/reporting-service
 
-go 1.23.0
+go 1.24.0
 
-toolchain go1.23.4
+toolchain go1.24.7
 
 require (
+	github.com/SENERGY-Platform/go-service-base/config-hdl v1.2.0
+	github.com/SENERGY-Platform/go-service-base/srv-info-hdl v0.2.0
+	github.com/SENERGY-Platform/go-service-base/struct-logger v0.4.1
+	github.com/SENERGY-Platform/go-service-base/util v1.1.0
 	github.com/SENERGY-Platform/service-commons v0.0.0-20250123095636-6dfc659ee43e
 	github.com/SENERGY-Platform/timescale-wrapper v0.0.34
 	github.com/axllent/mailpit v1.21.8
@@ -13,7 +17,6 @@ require (
 	github.com/globalsign/mgo v0.0.0-20181015135952-eeefdecb41b8
 	github.com/go-resty/resty/v2 v2.11.0
 	github.com/google/uuid v1.6.0
-	github.com/joho/godotenv v1.5.1
 	github.com/robfig/cron/v3 v3.0.1
 	go.mongodb.org/mongo-driver v1.16.1
 )
@@ -21,6 +24,7 @@ require (
 require (
 	github.com/GehirnInc/crypt v0.0.0-20230320061759-8cc1b52080c5 // indirect
 	github.com/PuerkitoBio/goquery v1.10.0 // indirect
+	github.com/SENERGY-Platform/go-env-loader v0.5.3 // indirect
 	github.com/SENERGY-Platform/models/go v0.0.0-20241007061544-de7132ae94e4 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de // indirect

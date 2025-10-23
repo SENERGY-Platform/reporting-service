@@ -26,7 +26,7 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/SENERGY-Platform/report-service/pkg/models"
+	"github.com/SENERGY-Platform/reporting-service/pkg/models"
 )
 import "github.com/go-resty/resty/v2"
 

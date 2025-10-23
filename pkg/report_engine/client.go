@@ -26,11 +26,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SENERGY-Platform/report-service/pkg/apis/senergy_devices"
-	"github.com/SENERGY-Platform/report-service/pkg/models"
+	"github.com/SENERGY-Platform/reporting-service/pkg/apis/senergy_devices"
+	"github.com/SENERGY-Platform/reporting-service/pkg/config"
+	"github.com/SENERGY-Platform/reporting-service/pkg/models"
 
-	"github.com/SENERGY-Platform/report-service/pkg/apis/senergy_db_v3"
-	"github.com/SENERGY-Platform/report-service/pkg/helper"
+	"github.com/SENERGY-Platform/reporting-service/pkg/apis/senergy_db_v3"
 	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
 	"github.com/globalsign/mgo/bson"
 	"github.com/google/uuid"
@@ -48,6 +48,7 @@ type Client struct {
 	Driver        ReportingDriver
 	DBClient      *senergy_db_v3.Client
 	DevicesClient *senergy_devices.Client
+	Config        *config.Config
 }
 
 // NewClient creates a new client with the given reporting driver.
@@ -57,15 +58,16 @@ type Client struct {
 //
 // Returns:
 // - client: The newly created client.
-func NewClient(driver ReportingDriver) *Client {
+func NewClient(driver ReportingDriver, config *config.Config) *Client {
 	dbClient := senergy_db_v3.NewClient(
-		helper.GetEnv("SENERGY_DB_URL", "http://localhost"),
-		helper.GetEnv("SENERGY_DB_PORT", "80"),
+		config.SNRGY.Url,
+		config.SNRGY.Port,
 	)
 	devicesClient := senergy_devices.NewClient(
-		helper.GetEnv("SENERGY_DB_URL", "http://localhost"),
-		helper.GetEnv("SENERGY_DB_PORT", "80"))
-	return &Client{Driver: driver, DBClient: dbClient, DevicesClient: devicesClient}
+		config.SNRGY.Url,
+		config.SNRGY.Port,
+	)
+	return &Client{Driver: driver, DBClient: dbClient, DevicesClient: devicesClient, Config: config}
 }
 
 // GetTemplates retrieves a list of available report templates.
@@ -522,7 +524,7 @@ func (r *Client) GetReportModels(authTokenString string, args map[string][]strin
 // Returns:
 // - err: An error if the operation fails.
 func (r *Client) RunScheduler() error {
-	tickerDur, err := time.ParseDuration(helper.GetEnv("SCHEDULER_TICKER_DURATION", "1m"))
+	tickerDur, err := time.ParseDuration(r.Config.SchedulerTickerDuration)
 	if err != nil {
 		return err
 	}
@@ -541,9 +543,9 @@ func (r *Client) RunScheduler() error {
 			}
 			log.Println("Creating scheduled report file for " + report.Id)
 			token, _, err := jwt.ExchangeUserToken(
-				helper.GetEnv("KEYCLOAK_URL", "http://localhost"),
-				helper.GetEnv("KEYCLOAK_CLIENT_ID", ""),
-				helper.GetEnv("KEYCLOAK_CLIENT_SECRET", ""),
+				r.Config.Keycloak.Url,
+				r.Config.Keycloak.ClientId,
+				r.Config.Keycloak.ClientSecret,
 				report.UserId,
 			)
 			if err != nil {
@@ -581,16 +583,16 @@ func (r *Client) EmailReport(reportFileId string, report models.Report, token st
 	}
 	subject := report.EmailSubject
 	if len(subject) == 0 {
-		subject = helper.GetEnv("EMAIL_SUBJECT", "Report")
+		subject = r.Config.Mail.Subject
 	}
 	text := report.EmailText
 	if len(text) == 0 {
-		text = helper.GetEnv("EMAIL_TEXT", "Report attached to this email")
+		text = r.Config.Mail.Text
 	}
 	email := models.SendRequest{
 		Bcc: report.EmailReceivers,
 		From: models.FromTo{
-			Email: helper.GetEnv("EMAIL_FROM", ""),
+			Email: r.Config.Mail.From,
 		},
 		Attachments: []struct {
 			// Base64-encoded string of the file content
@@ -620,7 +622,7 @@ func (r *Client) EmailReport(reportFileId string, report models.Report, token st
 		Text:    text,
 		HTML:    report.EmailHTML,
 	}
-	_, err = email.Send(helper.GetEnv("MAILPIT_URL", "http://mailpit.notifier:8025"))
+	_, err = email.Send(r.Config.Mail.MailpitUrl)
 	if err != nil {
 		return false, err
 	}

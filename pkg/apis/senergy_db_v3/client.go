@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/SENERGY-Platform/report-service/internal/models"
+	"github.com/SENERGY-Platform/reporting-service/pkg/models"
 	timescaleModels "github.com/SENERGY-Platform/timescale-wrapper/pkg/model"
 	"github.com/go-resty/resty/v2"
 )
@@ -70,7 +70,6 @@ func (s *Client) Query(authTokenString string, query timescaleModels.QueriesRequ
 			}
 		} else {
 			data = append(data, value[1])
-
 		}
 	}
 	return data, err
