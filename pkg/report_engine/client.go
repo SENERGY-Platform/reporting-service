@@ -29,6 +29,8 @@ import (
 	"github.com/SENERGY-Platform/reporting-service/pkg/apis/senergy_devices"
 	"github.com/SENERGY-Platform/reporting-service/pkg/config"
 	"github.com/SENERGY-Platform/reporting-service/pkg/util"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/SENERGY-Platform/reporting-service/pkg/apis/senergy_db_v3"
 	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
@@ -148,8 +150,7 @@ func (r *Client) CreateReportFile(reportRequest lib.Report, authTokenString stri
 // Returns:
 // - resultData: A map of interface{} containing the processed report data.
 // - err: An error if the operation fails.
-func (r *Client) setReportFileData(data map[string]lib.ReportObject, authToken string) (resultData map[string]interface{}, err error) {
-func (r *Client) setReportFileData(data map[string]models.ReportObject, authToken string, reportId string) (resultData map[string]interface{}, err error) {
+func (r *Client) setReportFileData(data map[string]lib.ReportObject, authToken string, reportId string) (resultData map[string]interface{}, err error) {
 	resultData = make(map[string]interface{}, len(data))
 	claims, err := jwt.Parse(authToken)
 	if err != nil {

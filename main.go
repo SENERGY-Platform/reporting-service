@@ -35,6 +35,7 @@ import (
 	"github.com/SENERGY-Platform/reporting-service/pkg/config"
 	"github.com/SENERGY-Platform/reporting-service/pkg/report_engine"
 	"github.com/SENERGY-Platform/reporting-service/pkg/util"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var Version = "0.0.42"
@@ -104,6 +105,12 @@ func main() {
 			return
 		}
 		cf()
+	}()
+
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		util.Logger.Info("Starting prometheus metrics on :2112/metrics")
+		util.Logger.Error("Metrics server exited: " + http.ListenAndServe(":2112", nil).Error())
 	}()
 
 	go func() {
