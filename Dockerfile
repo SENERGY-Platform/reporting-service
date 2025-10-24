@@ -1,21 +1,22 @@
-FROM golang:1.23 AS builder
+FROM golang:1.24 AS builder
+
+ARG VERSION=0.0.42
 
 COPY . /go/src/app
 WORKDIR /go/src/app
 
 ENV GO111MODULE=on
 
-RUN CGO_ENABLED=0 GOOS=linux make build
-
-RUN git log -1 --oneline > version.txt
+RUN CGO_ENABLED=0 GOOS=linux go build -o app -ldflags="-X 'main.version=$VERSION'" main.go
 
 FROM alpine:latest
-WORKDIR /root/
-COPY --from=builder /go/src/app/reporting-service .
-COPY --from=builder /go/src/app/version.txt .
-
-EXPOSE 8080
 
 LABEL org.opencontainers.image.source=https://github.com/SENERGY-Platform/reporting-service
 
-ENTRYPOINT ["./reporting-service"]
+WORKDIR /root/
+COPY --from=builder /go/src/app/app .
+COPY --from=builder /go/src/app/docs docs
+
+HEALTHCHECK --interval=10s --timeout=5s --retries=3 CMD wget -nv -t1 --spider 'http://localhost/health-check' || exit 1
+
+ENTRYPOINT ["./app"]
