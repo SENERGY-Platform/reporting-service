@@ -37,7 +37,7 @@ import (
 
 // CreateServer godoc
 // @title Reporting-Service API
-// @version 0.0.42
+// @version 0.0.43
 // @description For the administration of reports.
 // @license.name Apache-2.0
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html
