@@ -33,6 +33,19 @@ jobs:
         with:
           release_branches: ".*"
           github_token: ${{ secrets.GITHUB_TOKEN }}
+            # Replace all the occurrences of '{0}' with '42' in the README.md file
+      - name: Replace version in docs/swagger.json
+        uses: richardrigutins/replace-in-files@v2
+        with:
+          files: 'docs/swagger.json'
+          search-text: '{version}'
+          replacement-text: ${{ steps.tag_version.outputs.new_tag }}
+      - name: Replace version in main.go
+        uses: richardrigutins/replace-in-files@v2
+        with:
+          files: 'main.go'
+          search-text: '{version}'
+          replacement-text: ${{ steps.tag_version.outputs.new_tag }}
       - name: Build and push
         uses: docker/build-push-action@v2
         with:

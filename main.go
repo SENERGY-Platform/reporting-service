@@ -38,7 +38,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-var Version = "0.0.45"
+var Version = "{version}"
 
 func main() {
 	ec := 0
