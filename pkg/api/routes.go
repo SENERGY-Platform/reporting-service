@@ -25,3 +25,17 @@ var routes = gin_mw.Routes[report_engine.Client]{
 	getHealthCheckH,
 	getSwaggerDocH,
 }
+
+var routesAuth = gin_mw.Routes[report_engine.Client]{
+	getTemplates,
+	getTemplate,
+	getTemplatePreview,
+	postReportCreate,
+	postReport,
+	putReport,
+	getReports,
+	getReport,
+	deleteReport,
+	getReportFile,
+	deleteReportFile,
+}
