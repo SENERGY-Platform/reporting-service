@@ -37,12 +37,13 @@ import (
 
 // CreateServer godoc
 // @title Reporting-Service API
-// @version 0.0.43
+// @version 0.0.44
 // @description For the administration of reports.
 // @license.name Apache-2.0
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html
 // @BasePath /
 func CreateServer(cfg *config.Config, client *report_engine.Client) (r *gin.Engine, err error) {
+
 	port := strconv.FormatInt(int64(cfg.ServerPort), 10)
 	util.Logger.Info("Starting api server at port " + port)
 	if !cfg.Debug {
