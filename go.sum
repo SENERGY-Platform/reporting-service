@@ -4,6 +4,8 @@ github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c h1:udKWzYgxTojEK
 github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c/go.mod h1:xomTg63KZ2rFqZQzSB4Vz2SUXa1BpHTVz9L5PTmPC4E=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
+github.com/SENERGY-Platform/connection-log v0.0.15 h1:kNBgG3bYSfNnQ2MRSs2oIKw6WPAZL518HG2tji9sLUI=
+github.com/SENERGY-Platform/connection-log v0.0.15/go.mod h1:1DCO7GXNdA3nVuIIwhZs7kf7vfR2R78RS69soWpzuz4=
 github.com/SENERGY-Platform/gin-middleware v0.12.0 h1:FUnsqCM/o/o3r/XpMkULFuqvuvt8rprRCSU39YmKy+Y=
 github.com/SENERGY-Platform/gin-middleware v0.12.0/go.mod h1:t/wGjK1b3l3CofYqNEARyWniHCQ53nD3pcrWA9l8v3I=
 github.com/SENERGY-Platform/go-env-loader v0.5.3 h1:sNM/psxYBs3DeDCw8P8gWM2hvySijwy9t2DdSGdhF1c=
@@ -16,8 +18,8 @@ github.com/SENERGY-Platform/go-service-base/struct-logger v0.6.0 h1:DQNAPU1DI3XN
 github.com/SENERGY-Platform/go-service-base/struct-logger v0.6.0/go.mod h1:z9cf8WOUMLoifRj5Tqts1MNe6QoPFq5Msxj899ZC11g=
 github.com/SENERGY-Platform/go-service-base/util v1.1.0 h1:dsfWSfv+k0xr1kgasjIfw1UrvYL2G4QUmMvEwwNJi7c=
 github.com/SENERGY-Platform/go-service-base/util v1.1.0/go.mod h1:/gs/BaaSNwC+jbjsSgWDPoeMhfq8uJsf0WVQtyjP+wM=
-github.com/SENERGY-Platform/models/go v0.0.0-20250417103129-d12164244f83 h1:tV0gu66SvhPoeGWiuDtw0r/K13zMpuyOlgAo0EUsnfM=
-github.com/SENERGY-Platform/models/go v0.0.0-20250417103129-d12164244f83/go.mod h1:bCREPNRN4P8oxLgpC3/ZKK4jXSy4MSPXoiomhohE+aw=
+github.com/SENERGY-Platform/models/go v0.0.0-20251125064949-47c281672035 h1:UYwuYhfcp4WCNunz6bprnKl6yFJc/znk+jfRqvHSX0M=
+github.com/SENERGY-Platform/models/go v0.0.0-20251125064949-47c281672035/go.mod h1:bCREPNRN4P8oxLgpC3/ZKK4jXSy4MSPXoiomhohE+aw=
 github.com/SENERGY-Platform/service-commons v0.0.0-20251120132821-0c66860f211e h1:XoEU92V4/sBmpD0iiVA5A3JcF/sYsS5VI5bNGiLswEI=
 github.com/SENERGY-Platform/service-commons v0.0.0-20251120132821-0c66860f211e/go.mod h1:Jsmo+2h6ku4dw/YXZ/U3eYf9ofn6BPzS/47Tpo2oWQY=
 github.com/SENERGY-Platform/timescale-wrapper v0.0.51 h1:M8BQk5RYKiNTJSnLcJlV/BDNr+AydStEzuBCucecQHM=

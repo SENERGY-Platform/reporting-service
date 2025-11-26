@@ -25,7 +25,12 @@ import (
 	"strings"
 	"time"
 
+	connectionLogModels "github.com/SENERGY-Platform/connection-log/pkg/model"
+	snrgyModels "github.com/SENERGY-Platform/models/go/models"
 	"github.com/SENERGY-Platform/reporting-service/lib"
+	"github.com/SENERGY-Platform/reporting-service/pkg/apis/connection_log"
+	"github.com/SENERGY-Platform/reporting-service/pkg/apis/device_manager"
+	jsreportModels "github.com/SENERGY-Platform/reporting-service/pkg/apis/jsreport/models"
 	"github.com/SENERGY-Platform/reporting-service/pkg/apis/senergy_devices"
 	"github.com/SENERGY-Platform/reporting-service/pkg/config"
 	"github.com/SENERGY-Platform/reporting-service/pkg/util"
@@ -51,6 +56,8 @@ type Client struct {
 	DBClient      *senergy_db_v3.Client
 	DevicesClient *senergy_devices.Client
 	Config        *config.Config
+	DeviceManager *device_manager.Client
+	ConnectionLog *connection_log.Client
 }
 
 // NewClient creates a new client with the given reporting driver.
@@ -69,7 +76,15 @@ func NewClient(driver ReportingDriver, config *config.Config) *Client {
 		config.SNRGY.Url,
 		config.SNRGY.Port,
 	)
-	return &Client{Driver: driver, DBClient: dbClient, DevicesClient: devicesClient, Config: config}
+	deviceManagerClient := device_manager.NewClient(
+		config.SNRGY.Url,
+		config.SNRGY.Port,
+	)
+	connectionLogClient := connection_log.NewClient(
+		config.SNRGY.Url,
+		config.SNRGY.Port,
+	)
+	return &Client{Driver: driver, DBClient: dbClient, DevicesClient: devicesClient, Config: config, DeviceManager: deviceManagerClient, ConnectionLog: connectionLogClient}
 }
 
 // GetTemplates retrieves a list of available report templates.
@@ -231,9 +246,53 @@ func (r *Client) setReportFileData(data map[string]lib.ReportObject, authToken s
 				responseData = r.filterQueryValues(responseData)
 				resultData[key] = responseData
 			} else if value.DeviceQuery != nil {
-				var responseData []interface{}
-				responseData, err = r.DevicesClient.Query(authToken, *value.DeviceQuery.Last)
-				resultData[key] = responseData
+				var responseDataDevices []snrgyModels.Device
+				var responseDataStates []connectionLogModels.ResourceHistoricalStates
+
+				// get the duration from the last field
+				var duration time.Duration
+				duration, err = ParseDuration(*value.DeviceQuery.Last)
+				if err != nil {
+					return
+				}
+
+				// get device data
+				responseDataDevices, err = r.DeviceManager.Query(authToken)
+				// make ids list
+				deviceIds := make([]string, 0)
+				for _, device := range responseDataDevices {
+					deviceIds = append(deviceIds, device.Id)
+				}
+
+				// get device states data
+				responseDataStates, err = r.ConnectionLog.Query(authToken, deviceIds, duration)
+
+				// make request data by putting the device and states data together,
+				// keep the old format, so the template does not need to be changed
+				var requestData []jsreportModels.DeviceState
+				for _, device := range responseDataDevices {
+					for _, deviceStates := range responseDataStates {
+						if deviceStates.ID == device.Id {
+							// starte with previous state, so the graph is not empty
+							var logHistory jsreportModels.LogHistory
+							logHistory.Values = append(logHistory.Values, [][2]interface{}{
+								// cut the timeline at the desired duration (from the request)
+								{time.Now().Add(-duration).Unix(), deviceStates.PrevState.Connected},
+							}...)
+							for _, deviceState := range deviceStates.States {
+								logHistory.Values = append(logHistory.Values, [][2]interface{}{
+									{deviceState.Time.Unix(), deviceState.Connected},
+								}...)
+							}
+							requestData = append(requestData, jsreportModels.DeviceState{
+								Device:      device,
+								DisplayName: device.Name,
+								LogHistory:  logHistory,
+							})
+						}
+					}
+				}
+				resultData[key] = requestData
 			}
 		}
 	}

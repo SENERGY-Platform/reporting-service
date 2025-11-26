@@ -3,11 +3,13 @@ module github.com/SENERGY-Platform/reporting-service
 go 1.25.0
 
 require (
+	github.com/SENERGY-Platform/connection-log v0.0.15
 	github.com/SENERGY-Platform/gin-middleware v0.12.0
 	github.com/SENERGY-Platform/go-service-base/config-hdl v1.2.0
 	github.com/SENERGY-Platform/go-service-base/srv-info-hdl v0.2.0
 	github.com/SENERGY-Platform/go-service-base/struct-logger v0.6.0
 	github.com/SENERGY-Platform/go-service-base/util v1.1.0
+	github.com/SENERGY-Platform/models/go v0.0.0-20251125064949-47c281672035
 	github.com/SENERGY-Platform/service-commons v0.0.0-20251120132821-0c66860f211e
 	github.com/SENERGY-Platform/timescale-wrapper v0.0.51
 	github.com/gin-contrib/cors v1.7.6
@@ -23,7 +25,6 @@ require (
 
 require (
 	github.com/SENERGY-Platform/go-env-loader v0.5.3 // indirect
-	github.com/SENERGY-Platform/models/go v0.0.0-20250417103129-d12164244f83 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bradfitz/gomemcache v0.0.0-20250403215159-8d39553ac7cf // indirect
 	github.com/bytedance/gopkg v0.1.3 // indirect
