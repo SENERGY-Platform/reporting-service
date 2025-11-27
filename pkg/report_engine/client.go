@@ -275,14 +275,23 @@ func (r *Client) setReportFileData(data map[string]lib.ReportObject, authToken s
 						if deviceStates.ID == device.Id {
 							// starte with previous state, so the graph is not empty
 							var logHistory jsreportModels.LogHistory
-							logHistory.Values = append(logHistory.Values, [][2]interface{}{
+							logHistory.Values = append(logHistory.Values, [][3]interface{}{
 								// cut the timeline at the desired duration (from the request)
-								{time.Now().Add(-duration).Add(1 * time.Minute).Unix(), deviceStates.PrevState.Connected},
+								{time.Now().Add(-duration).Unix(), deviceStates.PrevState.Connected, time.Now().Add(-duration)},
 							}...)
 							for _, deviceState := range deviceStates.States {
-								logHistory.Values = append(logHistory.Values, [][2]interface{}{
-									{deviceState.Time.Unix(), deviceState.Connected},
+								logHistory.Values = append(logHistory.Values, [][3]interface{}{
+									{deviceState.Time.Unix(), deviceState.Connected, deviceState.Time},
 								}...)
+							}
+							// set correct device name
+							if device.Attributes != nil && hasAttributeWithKey(device.Attributes, "shared/nickname") {
+								for _, attr := range device.Attributes {
+									if attr.Key == "shared/nickname" {
+										device.Name = attr.Value
+										break
+									}
+								}
 							}
 							requestData = append(requestData, jsreportModels.DeviceState{
 								Device:      device,

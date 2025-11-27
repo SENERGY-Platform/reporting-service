@@ -26,5 +26,5 @@ type DeviceState struct {
 	LogHistory  LogHistory `json:"log_history"`
 }
 type LogHistory struct {
-	Values [][2]interface{} `json:"values"`
+	Values [][3]interface{} `json:"values"`
 }

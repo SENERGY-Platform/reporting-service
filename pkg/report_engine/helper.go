@@ -20,6 +20,8 @@ import (
 	"errors"
 	"strconv"
 	"time"
+
+	snrgyModels "github.com/SENERGY-Platform/models/go/models"
 )
 
 func ParseDuration(s string) (time.Duration, error) {
@@ -82,4 +84,13 @@ func ParseDuration(s string) (time.Duration, error) {
 	}
 
 	return total, nil
+}
+
+func hasAttributeWithKey(attributes []snrgyModels.Attribute, key string) bool {
+	for _, attr := range attributes {
+		if attr.Key == key {
+			return true
+		}
+	}
+	return false
 }
