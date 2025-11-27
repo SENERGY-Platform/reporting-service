@@ -277,7 +277,7 @@ func (r *Client) setReportFileData(data map[string]lib.ReportObject, authToken s
 							var logHistory jsreportModels.LogHistory
 							logHistory.Values = append(logHistory.Values, [][2]interface{}{
 								// cut the timeline at the desired duration (from the request)
-								{time.Now().Add(-duration).Unix(), deviceStates.PrevState.Connected},
+								{time.Now().Add(-duration).Add(1 * time.Minute).Unix(), deviceStates.PrevState.Connected},
 							}...)
 							for _, deviceState := range deviceStates.States {
 								logHistory.Values = append(logHistory.Values, [][2]interface{}{
