@@ -259,6 +259,11 @@ func (r *Client) setReportFileData(data map[string]lib.ReportObject, authToken s
 
 				// get device data
 				responseDataDevices, err = r.DeviceManager.Query(authToken)
+
+				if err != nil {
+					return
+				}
+
 				// make ids list
 				deviceIds := make([]string, 0)
 				for _, device := range responseDataDevices {
@@ -267,7 +272,9 @@ func (r *Client) setReportFileData(data map[string]lib.ReportObject, authToken s
 
 				// get device states data
 				responseDataStates, err = r.ConnectionLog.Query(authToken, deviceIds, duration)
-
+				if err != nil {
+					return
+				}
 				// make request data by putting the device and states data together,
 				// keep the old format, so the template does not need to be changed
 				var requestData []jsreportModels.DeviceState
@@ -607,33 +614,41 @@ func (r *Client) RunScheduler(ctx context.Context) error {
 
 		case <-ticker.C:
 			util.Logger.Debug("running scheduler")
-			cur, err := Reports().Find(CTX, bson.M{"scheduledfor": bson.M{"$lt": time.Now()}})
+			var cur *mongo.Cursor
+			cur, err = Reports().Find(CTX, bson.M{"scheduledfor": bson.M{"$lt": time.Now()}})
 			if err != nil {
-				return err
+				util.Logger.Error("could not get scheduled reports", "error", err)
+				continue
 			}
 			for cur.Next(CTX) {
 				var report lib.Report
-				err := cur.Decode(&report)
+				err = cur.Decode(&report)
 				if err != nil {
-					return err
+					util.Logger.Error("could not decode report", "error", err)
+					continue
 				}
 				util.Logger.Info("creating scheduled report file for " + report.Id)
-				token, _, err := jwt.ExchangeUserToken(
+				var token jwt.Token
+				token, _, err = jwt.ExchangeUserToken(
 					r.Config.Keycloak.Url,
 					r.Config.Keycloak.ClientId,
 					r.Config.Keycloak.ClientSecret,
 					report.UserId,
 				)
 				if err != nil {
-					return err
+					util.Logger.Error("could not exchange user token", "error", err)
+					continue
 				}
-				_, reportFileId, err := r.CreateReportFile(report, token.Token) // already calculates and saves next schedule
+				var reportFileId string
+				_, reportFileId, err = r.CreateReportFile(report, token.Token) // already calculates and saves next schedule
 				if err != nil {
-					return err
+					util.Logger.Error("could not create report file", "error", err)
+					continue
 				}
 				_, err = r.EmailReport(reportFileId, report, token.Token)
 				if err != nil {
-					return err
+					util.Logger.Error("could not email report", "error", err)
+					continue
 				}
 			}
 		}
