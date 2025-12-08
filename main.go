@@ -85,32 +85,41 @@ func main() {
 		Handler: httpHandler}
 
 	ctx, cf := context.WithCancel(context.Background())
+	defer cf()
 
 	go func() {
 		util.Wait(ctx, util.Logger, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 		cf()
 	}()
 
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		util.Logger.Info("starting prometheus metrics on :2112/metrics")
+		if err := http.ListenAndServe(":2112", nil); err != nil {
+			util.Logger.Error("metrics server exited", "error", err)
+		}
+	}()
+
 	wg := &sync.WaitGroup{}
 
-	wg.Add(1)
+	wg.Add(3)
 
 	go func() {
 		defer wg.Done()
 		util.Logger.Info("init scheduler")
-		err = client.RunScheduler()
+		err = client.RunScheduler(ctx)
+
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			util.Logger.Info("scheduler exited normally")
+			return
+		}
+
 		if err != nil {
 			util.Logger.Error("could not start scheduler", "error", err)
 			ec = 1
+			cf()
 			return
 		}
-		cf()
-	}()
-
-	go func() {
-		http.Handle("/metrics", promhttp.Handler())
-		util.Logger.Info("Starting prometheus metrics on :2112/metrics")
-		util.Logger.Error("Metrics server exited: " + http.ListenAndServe(":2112", nil).Error())
 	}()
 
 	go func() {
@@ -119,18 +128,18 @@ func main() {
 		if err = httpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			util.Logger.Error("starting server failed", attributes.ErrorKey, err)
 			ec = 1
+			cf()
+			return
 		}
-		cf()
 	}()
 
-	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		<-ctx.Done()
 		util.Logger.Info("stopping http server")
 		ctxWt, cf2 := context.WithTimeout(context.Background(), time.Second*5)
 		defer cf2()
-		if err := httpServer.Shutdown(ctxWt); err != nil {
+		if err = httpServer.Shutdown(ctxWt); err != nil {
 			util.Logger.Error("stopping server failed", attributes.ErrorKey, err)
 			ec = 1
 		} else {

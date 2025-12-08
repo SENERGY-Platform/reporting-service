@@ -17,6 +17,7 @@
 package report_engine
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -591,44 +592,52 @@ func (r *Client) GetReportModels(authTokenString string, args map[string][]strin
 //
 // Returns:
 // - err: An error if the operation fails.
-func (r *Client) RunScheduler() error {
+func (r *Client) RunScheduler(ctx context.Context) error {
 	tickerDur, err := time.ParseDuration(r.Config.SchedulerTickerDuration)
 	if err != nil {
 		return err
 	}
 	ticker := time.NewTicker(tickerDur)
+	defer ticker.Stop()
 	for {
-		<-ticker.C
-		util.Logger.Debug("running scheduler")
-		cur, err := Reports().Find(CTX, bson.M{"scheduledfor": bson.M{"$lt": time.Now()}})
-		if err != nil {
-			return err
+		select {
+		case <-ctx.Done():
+			util.Logger.Info("scheduler received shutdown signal")
+			return ctx.Err()
+
+		case <-ticker.C:
+			util.Logger.Debug("running scheduler")
+			cur, err := Reports().Find(CTX, bson.M{"scheduledfor": bson.M{"$lt": time.Now()}})
+			if err != nil {
+				return err
+			}
+			for cur.Next(CTX) {
+				var report lib.Report
+				err := cur.Decode(&report)
+				if err != nil {
+					return err
+				}
+				util.Logger.Info("creating scheduled report file for " + report.Id)
+				token, _, err := jwt.ExchangeUserToken(
+					r.Config.Keycloak.Url,
+					r.Config.Keycloak.ClientId,
+					r.Config.Keycloak.ClientSecret,
+					report.UserId,
+				)
+				if err != nil {
+					return err
+				}
+				_, reportFileId, err := r.CreateReportFile(report, token.Token) // already calculates and saves next schedule
+				if err != nil {
+					return err
+				}
+				_, err = r.EmailReport(reportFileId, report, token.Token)
+				if err != nil {
+					return err
+				}
+			}
 		}
-		for cur.Next(CTX) {
-			var report lib.Report
-			err := cur.Decode(&report)
-			if err != nil {
-				return err
-			}
-			util.Logger.Info("creating scheduled report file for " + report.Id)
-			token, _, err := jwt.ExchangeUserToken(
-				r.Config.Keycloak.Url,
-				r.Config.Keycloak.ClientId,
-				r.Config.Keycloak.ClientSecret,
-				report.UserId,
-			)
-			if err != nil {
-				return err
-			}
-			_, reportFileId, err := r.CreateReportFile(report, token.Token) // already calculates and saves next schedule
-			if err != nil {
-				return err
-			}
-			_, err = r.EmailReport(reportFileId, report, token.Token)
-			if err != nil {
-				return err
-			}
-		}
+
 	}
 }
 
