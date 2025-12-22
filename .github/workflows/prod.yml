@@ -33,7 +33,7 @@ jobs:
         with:
           release_branches: ".*"
           github_token: ${{ secrets.GITHUB_TOKEN }}
-            # Replace all the occurrences of '{0}' with '42' in the README.md file
+            # Replace all the occurrences of '{version}' with the version
       - name: Replace version in docs/swagger.json
         uses: richardrigutins/replace-in-files@v2
         with:

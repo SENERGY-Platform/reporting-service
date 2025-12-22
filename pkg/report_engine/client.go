@@ -281,12 +281,15 @@ func (r *Client) setReportFileData(data map[string]lib.ReportObject, authToken s
 				for _, device := range responseDataDevices {
 					for _, deviceStates := range responseDataStates {
 						if deviceStates.ID == device.Id {
-							// starte with previous state, so the graph is not empty
 							var logHistory jsreportModels.LogHistory
-							logHistory.Values = append(logHistory.Values, [][3]interface{}{
-								// cut the timeline at the desired duration (from the request)
-								{time.Now().Add(-duration).Unix(), deviceStates.PrevState.Connected, time.Now().Add(-duration)},
-							}...)
+							// start with previous state, so the graph is not empty, buit only use it, if it is not nil (device was registered during the last reporting days cycle)
+							if deviceStates.PrevState != nil {
+								logHistory.Values = append(logHistory.Values, [][3]interface{}{
+									// cut the timeline at the desired duration (from the request)
+									{time.Now().Add(-duration).Unix(), deviceStates.PrevState.Connected, time.Now().Add(-duration)},
+								}...)
+							}
+
 							for _, deviceState := range deviceStates.States {
 								logHistory.Values = append(logHistory.Values, [][3]interface{}{
 									{deviceState.Time.Unix(), deviceState.Connected, deviceState.Time},
