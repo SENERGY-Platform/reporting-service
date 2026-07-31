@@ -13,58 +13,9 @@ Generate swagger docs:
 
 ## jsreport reports
 
-The reports of the jsreport folder `/senergy_reports` live in
-[report-templates](https://github.com/SENERGY-Platform/report-templates), one
-file per syncable property of template, script, data entity and asset. Git is the
-source of truth for them, so a change is made locally, tested locally and then
-committed there.
-
-`jsreport-sync` moves those files between a jsreport instance and a checkout of
-that repository. It only writes the content carrying properties of entities
-inside the managed folder: no engine or recipe, no links between the entities, no
-permissions, no ids, and it never deletes. Entities that exist only in the
-instance are reported and left alone.
-
-    go run ./cmd/jsreport-sync <pull|push|diff> [flags]
-
-| command | effect |
-| --- | --- |
-| `pull` | write the entities of the instance into the local directory |
-| `push` | apply the local files to the instance |
-| `diff` | report what `push` would change, exit code 1 on drift |
-
-Run it from the report-templates checkout, or point `-dir` at it:
-
-    go run ./cmd/jsreport-sync pull -user admin -password password -dir ../report-templates
-
-Reading the files from a git ref instead of a checkout works as well, which is
-what a run outside of a checkout uses:
-
-    go run ./cmd/jsreport-sync push -from-git main -url http://jsreport.example:5488
-
-### Flags and environment
-
-Every flag has an environment variable, so the command needs no arguments where
-the environment is set up.
-
-| flag | variable | default |
-| --- | --- | --- |
-| `-url` | `JSREPORT_URL` | `http://localhost:5488` |
-| `-user`, `-password` | `JSREPORT_USER`, `JSREPORT_PASSWORD` | empty |
-| `-token` | `JSREPORT_TOKEN` | empty, takes precedence over basic auth |
-| `-folder` | `JSREPORT_FOLDER` | `/senergy_reports` |
-| `-dir` | `JSREPORT_SYNC_DIR` | `.` |
-| `-from-git` | `JSREPORT_SYNC_REF` | empty, read `-dir` instead |
-| `-repo` | `JSREPORT_SYNC_REPO` | `SENERGY-Platform/report-templates` |
-| `-repo-token` | `JSREPORT_SYNC_REPO_TOKEN` | empty, only for private repositories |
-| `-create` | `JSREPORT_SYNC_CREATE` | `false` |
-
-An entity that does not exist in the target is only reported. `-create` inserts
-scripts, data entities and assets, but never templates, and it does not link them
-to a template - a new report is created and linked once in the studio.
-
-A `.data.json` file that is not valid json is reported as `invalid` and not
-written, so a broken sample data file cannot take a report's preview down.
+The reports of the jsreport folder `/senergy_reports` and `jsreport-sync`, the
+tool that keeps them in sync with an instance, live in
+[report-sync](https://github.com/SENERGY-Platform/report-sync).
 
 ## Example
 ### GET /templates

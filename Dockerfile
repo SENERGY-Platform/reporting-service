@@ -6,7 +6,6 @@ WORKDIR /go/src/app
 ENV GO111MODULE=on
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o app main.go
-RUN CGO_ENABLED=0 GOOS=linux go build -o jsreport-sync ./cmd/jsreport-sync
 
 FROM alpine:latest
 
@@ -14,7 +13,6 @@ LABEL org.opencontainers.image.source=https://github.com/SENERGY-Platform/report
 
 WORKDIR /root/
 COPY --from=builder /go/src/app/app .
-COPY --from=builder /go/src/app/jsreport-sync .
 COPY --from=builder /go/src/app/docs docs
 
 HEALTHCHECK --interval=10s --timeout=5s --retries=3 CMD wget -nv -t1 --spider 'http://localhost/health-check' || exit 1
