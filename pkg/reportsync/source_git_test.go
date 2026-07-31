@@ -23,6 +23,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -66,6 +67,57 @@ func TestGitSourceReadsReportFilesFromRepositoryRoot(t *testing.T) {
 	}
 	if files["device_state/device-state.script.js"] != "script from git" {
 		t.Errorf("script content wrong: %q", files["device_state/device-state.script.js"])
+	}
+}
+
+func TestGitSourceWithTokenUsesApiEndpointAndFollowsRedirect(t *testing.T) {
+	// the signed archive host, reached through the redirect
+	archive := tarballServer(t, map[string]string{
+		"device_state/device-state.script.js": "from private repo",
+	})
+
+	var seenPath, seenAuth, seenAgent string
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seenPath = r.URL.Path
+		seenAuth = r.Header.Get("Authorization")
+		seenAgent = r.Header.Get("User-Agent")
+		http.Redirect(w, r, archive+"/signed-archive", http.StatusFound)
+	}))
+	t.Cleanup(api.Close)
+
+	files, err := GitSource{
+		Repo:    "SENERGY-Platform/report-templates",
+		Ref:     "main",
+		Dir:     ".",
+		Token:   "gh-token",
+		ApiHost: api.URL,
+	}.Files(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if seenPath != "/repos/SENERGY-Platform/report-templates/tarball/main" {
+		t.Errorf("want the api tarball endpoint, got %q", seenPath)
+	}
+	if seenAuth != "Bearer gh-token" {
+		t.Errorf("want a bearer token, got %q", seenAuth)
+	}
+	if seenAgent == "" {
+		t.Error("the api rejects requests without a user agent")
+	}
+	if files["device_state/device-state.script.js"] != "from private repo" {
+		t.Errorf("archive content did not survive the redirect: %v", files)
+	}
+}
+
+func TestGitSourceWithoutTokenExplainsA404(t *testing.T) {
+	notFound := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	t.Cleanup(notFound.Close)
+
+	_, err := GitSource{Repo: "x/y", Ref: "main", Dir: ".", Host: notFound.URL}.Files(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "needs a token") {
+		t.Errorf("want a hint about the missing token, got %v", err)
 	}
 }
 

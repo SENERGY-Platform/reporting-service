@@ -41,30 +41,55 @@ type GitSource struct {
 	Dir string
 	// Token is optional, only needed for private repositories.
 	Token string
-	// Host overrides the archive host, only used by tests.
+	// Host overrides the public archive host, only used by tests.
 	Host string
+	// ApiHost overrides the api host used with a token, only used by tests.
+	ApiHost string
+}
+
+// archiveUrl is the endpoint the archive is fetched from. Without a token the
+// public archive host is enough; with one the api endpoint has to be used, which
+// answers with a redirect to a signed archive url. codeload does not accept
+// bearer tokens.
+func (g GitSource) archiveUrl() string {
+	if g.Token != "" {
+		host := g.ApiHost
+		if host == "" {
+			host = "https://api.github.com"
+		}
+		return fmt.Sprintf("%s/repos/%s/tarball/%s", strings.TrimRight(host, "/"), g.Repo, g.Ref)
+	}
+	host := g.Host
+	if host == "" {
+		host = "https://codeload.github.com"
+	}
+	return fmt.Sprintf("%s/%s/tar.gz/%s", strings.TrimRight(host, "/"), g.Repo, g.Ref)
 }
 
 // Files fetches the repository archive at the given ref and returns the report
 // files of GitSource.Dir keyed by their path relative to it.
 func (g GitSource) Files(ctx context.Context) (map[string]string, error) {
-	host := g.Host
-	if host == "" {
-		host = "https://codeload.github.com"
-	}
-	target := fmt.Sprintf("%s/%s/tar.gz/%s", strings.TrimRight(host, "/"), g.Repo, g.Ref)
+	target := g.archiveUrl()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
 		return nil, err
 	}
+	// the api rejects requests without a user agent
+	req.Header.Set("User-Agent", "jsreport-sync")
 	if g.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+g.Token)
+		req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 	}
+	// the redirect target is signed, and http.Client drops the authorization
+	// header across hosts anyway
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound && g.Token == "" {
+		return nil, fmt.Errorf("could not fetch %s: %s - a private repository needs a token", target, resp.Status)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("could not fetch %s: %s", target, resp.Status)
 	}
