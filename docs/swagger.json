@@ -169,14 +169,14 @@
         },
         "/report/create": {
             "post": {
-                "description": "Creates report file",
+                "description": "Queues creation of a report file. Returns the id of the report and the id of the job that tracks the creation, which can be polled at /report/job/:jobId.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Report"
                 ],
-                "summary": "Create report file",
+                "summary": "Queue report file creation",
                 "parameters": [
                     {
                         "description": "Report",
@@ -189,10 +189,13 @@
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "202": {
+                        "description": "Accepted",
                         "schema": {
-                            "type": "string"
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
                     "500": {
@@ -234,6 +237,12 @@
                     "200": {
                         "description": "OK"
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -251,6 +260,102 @@
                 "responses": {
                     "204": {
                         "description": "No Content",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/report/job": {
+            "get": {
+                "description": "Gets the most recent report jobs of the user, newest first",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Report"
+                ],
+                "summary": "Get report jobs",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "only jobs of this report",
+                        "name": "reportId",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "maximum number of jobs to return",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/lib.ReportJob"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/report/job/:jobId": {
+            "get": {
+                "description": "Gets the status of a queued report file creation",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Report"
+                ],
+                "summary": "Get report job by id",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Job ID",
+                        "name": "jobId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/lib.ReportJob"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "type": "string"
                         }
@@ -282,6 +387,12 @@
                             "items": {
                                 "$ref": "#/definitions/lib.Template"
                             }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
                         }
                     },
                     "500": {
@@ -319,6 +430,12 @@
                             "$ref": "#/definitions/lib.Template"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -350,6 +467,12 @@
                 "responses": {
                     "200": {
                         "description": "OK"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
                     },
                     "500": {
                         "description": "Internal Server Error",
@@ -508,6 +631,53 @@
                     "type": "string"
                 }
             }
+        },
+        "lib.ReportJob": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "finishedAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "reportFileId": {
+                    "type": "string"
+                },
+                "reportId": {
+                    "type": "string"
+                },
+                "startedAt": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/lib.ReportJobStatus"
+                },
+                "step": {
+                    "type": "string"
+                }
+            }
+        },
+        "lib.ReportJobStatus": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "running",
+                "done",
+                "failed"
+            ],
+            "x-enum-varnames": [
+                "ReportJobPending",
+                "ReportJobRunning",
+                "ReportJobDone",
+                "ReportJobFailed"
+            ]
         },
         "lib.ReportObject": {
             "type": "object",

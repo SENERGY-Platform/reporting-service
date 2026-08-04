@@ -21,6 +21,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -40,9 +41,10 @@ import (
 
 	"github.com/SENERGY-Platform/reporting-service/pkg/apis/senergy_db_v3"
 	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
-	"github.com/globalsign/mgo/bson"
 	"github.com/google/uuid"
 	"github.com/robfig/cron/v3"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -59,6 +61,9 @@ type Client struct {
 	Config        *config.Config
 	DeviceManager *device_manager.Client
 	ConnectionLog *connection_log.Client
+	// jobs is shared between the api handlers and the report job workers. It is a
+	// pointer because gin handlers receive a copy of the Client.
+	jobs *jobQueue
 }
 
 // NewClient creates a new client with the given reporting driver.
@@ -85,7 +90,7 @@ func NewClient(driver ReportingDriver, config *config.Config) *Client {
 		config.SNRGY.Url,
 		config.SNRGY.Port,
 	)
-	return &Client{Driver: driver, DBClient: dbClient, DevicesClient: devicesClient, Config: config, DeviceManager: deviceManagerClient, ConnectionLog: connectionLogClient}
+	return &Client{Driver: driver, DBClient: dbClient, DevicesClient: devicesClient, Config: config, DeviceManager: deviceManagerClient, ConnectionLog: connectionLogClient, jobs: newJobQueue()}
 }
 
 // GetTemplates retrieves a list of available report templates.
@@ -124,23 +129,27 @@ func (r *Client) GetTemplatePreviewById(id string, authString string) (content [
 // Returns:
 // - err: An error if the operation fails.
 func (r *Client) CreateReportFile(reportRequest lib.Report, authTokenString string) (resultReport lib.Report, reportFileId string, err error) {
-	reportModel, err := r.GetReportModel(reportRequest.Id, authTokenString)
-	// if no report model is found, create a new one
-	if errors.Is(err, mongo.ErrNoDocuments) || reportModel.Id == "" {
-		reportModel, _ = r.SaveReportModel(reportRequest, authTokenString)
-		reportRequest = reportModel
-	} else if err != nil {
+	return r.CreateReportFileWithProgress(reportRequest, authTokenString, nil)
+}
+
+// CreateReportFileWithProgress does the same as CreateReportFile and reports the
+// step it is working on through onStep, which lets a caller expose progress while
+// the report is being built. onStep may be nil.
+func (r *Client) CreateReportFileWithProgress(reportRequest lib.Report, authTokenString string, onStep func(step string)) (resultReport lib.Report, reportFileId string, err error) {
+	reportRequest, err = r.ensureReportModel(reportRequest, authTokenString)
+	if err != nil {
 		return
 	}
-	reportRequest.ReportFiles = reportModel.ReportFiles
 
 	// set report file data
+	reportStep(onStep, lib.ReportJobStepCollectingData)
 	reportData, err := r.setReportFileData(reportRequest.Data, authTokenString, reportRequest.Id)
 	if err != nil {
 		return
 	}
 
 	// create the actual report file using the underlying driver
+	reportStep(onStep, lib.ReportJobStepRendering)
 	reportFileId, reportFileType, reportFileLink, err := r.Driver.CreateReport(reportRequest.Name, reportRequest.TemplateName, reportData, authTokenString)
 	if err != nil {
 		return
@@ -148,7 +157,6 @@ func (r *Client) CreateReportFile(reportRequest lib.Report, authTokenString stri
 
 	// add the report file model to the report model
 	reportRequest.ReportFiles = append(reportRequest.ReportFiles, lib.ReportFile{Id: reportFileId, Type: reportFileType, Link: reportFileLink, CreatedAt: time.Now()})
-	reportRequest.CreatedAt = reportModel.CreatedAt
 	err = r.UpdateReportModel(reportRequest, authTokenString)
 	if err != nil {
 		return
@@ -156,6 +164,31 @@ func (r *Client) CreateReportFile(reportRequest lib.Report, authTokenString stri
 
 	resultReport = reportRequest
 	return
+}
+
+// ensureReportModel returns the stored report model for a request, creating it if
+// the request does not point at an existing one. The report files and creation date
+// of the stored model are carried over, because the request only describes what to
+// render, not what has been rendered before.
+func (r *Client) ensureReportModel(reportRequest lib.Report, authTokenString string) (report lib.Report, err error) {
+	if reportRequest.Id != "" {
+		stored, e := r.GetReportModel(reportRequest.Id, authTokenString)
+		if e != nil && !errors.Is(e, mongo.ErrNoDocuments) {
+			return report, e
+		}
+		if stored.Id != "" {
+			reportRequest.ReportFiles = stored.ReportFiles
+			reportRequest.CreatedAt = stored.CreatedAt
+			return reportRequest, nil
+		}
+	}
+	return r.SaveReportModel(reportRequest, authTokenString)
+}
+
+func reportStep(onStep func(step string), step string) {
+	if onStep != nil {
+		onStep(step)
+	}
 }
 
 // setReportFileData recursively sets report data based on the input data and authorization token.
@@ -330,42 +363,50 @@ func (r *Client) filterQueryValues(queryValues []interface{}) (filteredData []in
 	return
 }
 
+// updateStartAndEndDate rolls the configured start and end date of a query forward
+// into the current month or year. A query without a time range and an offset that
+// was not sent are both valid, so neither may be dereferenced blindly.
 func (r *Client) updateStartAndEndDate(object *lib.ReportObject) (err error) {
-	if object.QueryOptions != nil {
-		if object.QueryOptions.RollingStartDate != nil && object.Query.Time.Start != nil {
-			startDate, e := time.Parse(time.RFC3339, *object.Query.Time.Start)
-			if e != nil {
-				return
-			}
-			startDate = startDate.Add(time.Minute * time.Duration(-*object.QueryOptions.StartOffset))
-			newDate := startDate
-			switch *object.QueryOptions.RollingStartDate {
-			case "month":
-				newDate = time.Date(time.Now().Year(), time.Now().Month(), startDate.Day(), 0, 0, 0, 0, time.UTC)
-			case "year":
-				newDate = time.Date(time.Now().Year(), startDate.Month(), startDate.Day(), 0, 0, 0, 0, time.UTC)
-			}
-			newDate = newDate.Add(time.Minute * time.Duration(*object.QueryOptions.StartOffset))
-			*object.Query.Time.Start = newDate.Format(time.RFC3339)
-		}
-		if object.QueryOptions.RollingEndDate != nil && object.Query.Time.End != nil {
-			endDate, e := time.Parse(time.RFC3339, *object.Query.Time.End)
-			if e != nil {
-				return
-			}
-			endDate = endDate.Add(time.Minute * time.Duration(-*object.QueryOptions.EndOffset))
-			newDate := endDate
-			switch *object.QueryOptions.RollingEndDate {
-			case "month":
-				newDate = time.Date(time.Now().Year(), time.Now().Month(), endDate.Day(), 0, 0, 0, 0, time.UTC)
-			case "year":
-				newDate = time.Date(time.Now().Year(), endDate.Month(), endDate.Day(), 0, 0, 0, 0, time.UTC)
-			}
-			newDate = newDate.Add(time.Minute * time.Duration(*object.QueryOptions.EndOffset))
-			*object.Query.Time.End = newDate.Format(time.RFC3339)
-		}
+	if object.QueryOptions == nil || object.Query == nil || object.Query.Time == nil {
+		return nil
 	}
-	return
+	if object.QueryOptions.RollingStartDate != nil && object.Query.Time.Start != nil {
+		rolled, e := rollDate(*object.Query.Time.Start, *object.QueryOptions.RollingStartDate, object.QueryOptions.StartOffset)
+		if e != nil {
+			return e
+		}
+		*object.Query.Time.Start = rolled
+	}
+	if object.QueryOptions.RollingEndDate != nil && object.Query.Time.End != nil {
+		rolled, e := rollDate(*object.Query.Time.End, *object.QueryOptions.RollingEndDate, object.QueryOptions.EndOffset)
+		if e != nil {
+			return e
+		}
+		*object.Query.Time.End = rolled
+	}
+	return nil
+}
+
+// rollDate moves date into the current month or year, keeping the day of month and
+// the offset in minutes that the stored date carries.
+func rollDate(date string, rolling string, offsetMinutes *int) (string, error) {
+	parsed, err := time.Parse(time.RFC3339, date)
+	if err != nil {
+		return "", err
+	}
+	offset := time.Duration(0)
+	if offsetMinutes != nil {
+		offset = time.Minute * time.Duration(*offsetMinutes)
+	}
+	parsed = parsed.Add(-offset)
+	newDate := parsed
+	switch rolling {
+	case "month":
+		newDate = time.Date(time.Now().Year(), time.Now().Month(), parsed.Day(), 0, 0, 0, 0, time.UTC)
+	case "year":
+		newDate = time.Date(time.Now().Year(), parsed.Month(), parsed.Day(), 0, 0, 0, 0, time.UTC)
+	}
+	return newDate.Add(offset).Format(time.RFC3339), nil
 }
 
 // DownloadReportFile downloads a report file with the given file ID from the given report.
@@ -447,7 +488,12 @@ func (r *Client) SaveReportModel(report lib.Report, authTokenString string) (sav
 	}
 	report.ScheduledFor = ts
 	report.CreatedAt = time.Now()
-	_, err = Reports().InsertOne(CTX, report)
+	ctx, cancel := dbCtx()
+	defer cancel()
+	_, err = Reports().InsertOne(ctx, report)
+	if err != nil {
+		return lib.Report{}, err
+	}
 	savedReport = report
 	return
 }
@@ -474,13 +520,15 @@ func (r *Client) UpdateReportModel(report lib.Report, authTokenString string) (e
 	report.UpdatedAt = time.Now()
 	if report.ReportFiles == nil {
 		oldReport, e := r.GetReportModel(report.Id, authTokenString)
-		if e != nil {
-			return
+		if e != nil && !errors.Is(e, mongo.ErrNoDocuments) {
+			return e
 		}
 		report.ReportFiles = oldReport.ReportFiles
 		report.CreatedAt = oldReport.CreatedAt
 	}
-	_, err = Reports().ReplaceOne(CTX, bson.M{"_id": report.Id, "userid": claims.GetUserId()}, report, options.Replace().SetUpsert(true))
+	ctx, cancel := dbCtx()
+	defer cancel()
+	_, err = Reports().ReplaceOne(ctx, bson.M{"_id": report.Id, "userid": claims.GetUserId()}, report, options.Replace().SetUpsert(true))
 	return
 }
 
@@ -512,7 +560,9 @@ func (r *Client) DeleteReport(id string, authTokenString string, admin bool) (er
 			return
 		}
 	}
-	res := Reports().FindOneAndDelete(CTX, req)
+	ctx, cancel := dbCtx()
+	defer cancel()
+	res := Reports().FindOneAndDelete(ctx, req)
 	return res.Err()
 }
 
@@ -530,7 +580,9 @@ func (r *Client) GetReportModel(id string, authTokenString string) (report lib.R
 	if err != nil {
 		return
 	}
-	err = Reports().FindOne(CTX, bson.M{"_id": id, "userid": claims.GetUserId()}).Decode(&report)
+	ctx, cancel := dbCtx()
+	defer cancel()
+	err = Reports().FindOne(ctx, bson.M{"_id": id, "userid": claims.GetUserId()}).Decode(&report)
 	if err != nil {
 		return lib.Report{}, err
 	}
@@ -552,38 +604,26 @@ func (r *Client) GetReportModels(authTokenString string, args map[string][]strin
 	if err != nil {
 		return
 	}
-	opt := options.Find()
-	for arg, value := range args {
-		if arg == "limit" {
-			limit, _ := strconv.ParseInt(value[0], 10, 64)
-			opt.SetLimit(limit)
-		}
-		if arg == "offset" {
-			skip, _ := strconv.ParseInt(value[0], 10, 64)
-			opt.SetSkip(skip)
-		}
-		if arg == "order" {
-			ord := strings.Split(value[0], ":")
-			order := 1
-			if ord[1] == "desc" {
-				order = -1
-			}
-			opt.SetSort(bson.M{ord[0]: int64(order)})
-		}
+	opt, err := reportListOptions(args)
+	if err != nil {
+		return nil, err
 	}
-	var cur *mongo.Cursor
 	req := bson.M{"userid": claims.GetUserId()}
-	if val, ok := args["search"]; ok {
-		req = bson.M{"userid": claims.GetUserId(), "_id": bson.RegEx{Pattern: val[0], Options: "i"}}
+	if val, ok := args["search"]; ok && len(val) > 0 {
+		req = bson.M{"userid": claims.GetUserId(), "_id": primitive.Regex{Pattern: regexp.QuoteMeta(val[0]), Options: "i"}}
 	}
 	if admin {
 		req = bson.M{}
 	}
-	cur, err = Reports().Find(CTX, req, opt)
+	ctx, cancel := dbCtx()
+	defer cancel()
+	var cur *mongo.Cursor
+	cur, err = Reports().Find(ctx, req, opt)
 	if err != nil {
 		return nil, err
 	}
-	for cur.Next(CTX) {
+	defer func() { _ = cur.Close(ctx) }()
+	for cur.Next(ctx) {
 		// create a value into which the single document can be decoded
 		var elem lib.Report
 		err = cur.Decode(&elem)
@@ -592,7 +632,44 @@ func (r *Client) GetReportModels(authTokenString string, args map[string][]strin
 		}
 		reports = append(reports, elem)
 	}
-	return
+	return reports, cur.Err()
+}
+
+// reportListOptions turns the query arguments of a report listing into find
+// options. The arguments come straight from the url, so every one of them is
+// rejected rather than trusted when it does not parse.
+func reportListOptions(args map[string][]string) (*options.FindOptions, error) {
+	opt := options.Find()
+	if val, ok := args["limit"]; ok && len(val) > 0 {
+		limit, err := strconv.ParseInt(val[0], 10, 64)
+		if err != nil || limit < 0 {
+			return nil, errors.New("invalid limit: " + val[0])
+		}
+		opt.SetLimit(limit)
+	}
+	if val, ok := args["offset"]; ok && len(val) > 0 {
+		skip, err := strconv.ParseInt(val[0], 10, 64)
+		if err != nil || skip < 0 {
+			return nil, errors.New("invalid offset: " + val[0])
+		}
+		opt.SetSkip(skip)
+	}
+	if val, ok := args["order"]; ok && len(val) > 0 {
+		ord := strings.Split(val[0], ":")
+		if len(ord) != 2 || ord[0] == "" {
+			return nil, errors.New("invalid order, expected <field>:<asc|desc>: " + val[0])
+		}
+		order := 1
+		switch ord[1] {
+		case "asc":
+		case "desc":
+			order = -1
+		default:
+			return nil, errors.New("invalid order direction: " + ord[1])
+		}
+		opt.SetSort(bson.D{{Key: ord[0], Value: order}})
+	}
+	return opt, nil
 }
 
 // RunScheduler regularly checks if any reports need to be created based on their cron schedule and handles report creation accordingly.
@@ -617,46 +694,88 @@ func (r *Client) RunScheduler(ctx context.Context) error {
 
 		case <-ticker.C:
 			util.Logger.Debug("running scheduler")
-			var cur *mongo.Cursor
-			cur, err = Reports().Find(CTX, bson.M{"scheduledfor": bson.M{"$lt": time.Now()}})
-			if err != nil {
-				util.Logger.Error("could not get scheduled reports", "error", err)
-				continue
-			}
-			for cur.Next(CTX) {
-				var report lib.Report
-				err = cur.Decode(&report)
-				if err != nil {
-					util.Logger.Error("could not decode report", "error", err)
-					continue
-				}
-				util.Logger.Info("creating scheduled report file for " + report.Id)
-				var token jwt.Token
-				token, _, err = jwt.ExchangeUserToken(
-					r.Config.Keycloak.Url,
-					r.Config.Keycloak.ClientId,
-					r.Config.Keycloak.ClientSecret,
-					report.UserId,
-				)
-				if err != nil {
-					util.Logger.Error("could not exchange user token", "error", err)
-					continue
-				}
-				var reportFileId string
-				_, reportFileId, err = r.CreateReportFile(report, token.Token) // already calculates and saves next schedule
-				if err != nil {
-					util.Logger.Error("could not create report file", "error", err)
-					continue
-				}
-				_, err = r.EmailReport(reportFileId, report, token.Token)
-				if err != nil {
-					util.Logger.Error("could not email report", "error", err)
-					continue
-				}
-			}
+			r.enqueueDueReports()
 		}
-
 	}
+}
+
+// enqueueDueReports queues a report file creation for every report whose cron
+// schedule is due. Rendering happens in the report job workers, so the scheduler
+// tick is not held up by a long report and both entry points share one concurrency
+// limit.
+func (r *Client) enqueueDueReports() {
+	due, err := dueReports()
+	if err != nil {
+		util.Logger.Error("could not get scheduled reports", "error", err)
+		return
+	}
+	for _, report := range due {
+		// The schedule is advanced before queueing, because the report stays due
+		// until it is and would otherwise be queued again on every tick.
+		if err = r.advanceSchedule(report); err != nil {
+			util.Logger.Error("could not advance report schedule", "error", err, "report_id", report.Id)
+			continue
+		}
+		var unfinished bool
+		unfinished, err = r.hasUnfinishedJob(report.Id)
+		if err != nil {
+			util.Logger.Error("could not look up running report jobs", "error", err, "report_id", report.Id)
+			continue
+		}
+		if unfinished {
+			util.Logger.Warn("skipping scheduled report, a previous run has not finished yet", "report_id", report.Id)
+			continue
+		}
+		var job lib.ReportJob
+		job, err = r.insertReportJob(lib.ReportJob{
+			ReportId:  report.Id,
+			UserId:    report.UserId,
+			Request:   report,
+			SendEmail: true,
+		})
+		if err != nil {
+			util.Logger.Error("could not queue scheduled report", "error", err, "report_id", report.Id)
+			continue
+		}
+		util.Logger.Info("queued scheduled report", "report_id", report.Id, "job_id", job.Id)
+	}
+}
+
+// dueReports reads every report whose schedule has passed. The cursor is drained
+// before anything is written, so queueing a long list cannot outlive it.
+//
+// Reports without a cron carry no schedule at all. Mongo compares only within a
+// bson type, so a null never matches the date comparison below.
+func dueReports() (reports []lib.Report, err error) {
+	ctx, cancel := dbCtx()
+	defer cancel()
+	cur, err := Reports().Find(ctx, bson.M{"scheduledfor": bson.M{"$lt": time.Now()}})
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cur.Close(ctx) }()
+	for cur.Next(ctx) {
+		var report lib.Report
+		if err = cur.Decode(&report); err != nil {
+			util.Logger.Error("could not decode report", "error", err)
+			continue
+		}
+		reports = append(reports, report)
+	}
+	return reports, cur.Err()
+}
+
+// advanceSchedule writes the next due date of a report. Only that one field is
+// updated, so a report that is about to be rendered is not overwritten wholesale.
+func (r *Client) advanceSchedule(report lib.Report) error {
+	ts, err := calculateNextSchedule(report)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := dbCtx()
+	defer cancel()
+	_, err = Reports().UpdateOne(ctx, bson.M{"_id": report.Id}, bson.M{"$set": bson.M{"scheduledfor": ts}})
+	return err
 }
 
 // EmailReport sends the specified report file to the email adrdesses specified in the report

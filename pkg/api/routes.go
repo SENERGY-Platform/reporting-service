@@ -34,6 +34,8 @@ var routesAuth = gin_mw.Routes[report_engine.Client]{
 	postReport,
 	putReport,
 	getReports,
+	getReportJob,
+	getReportJobs,
 	getReport,
 	deleteReport,
 	getReportFile,

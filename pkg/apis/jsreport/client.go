@@ -42,6 +42,31 @@ var TypeMap = map[string]string{
 	"html-to-xlsx": "Excel",
 }
 
+// ErrUnauthorized reports that jsreport did not accept the token it was given.
+// jsreport validates the forwarded user token against its configured authorization
+// server, so this means that server considered the token invalid — most commonly
+// because the introspecting client is not in the audience of the token.
+var ErrUnauthorized = fmt.Errorf("jsreport-unauthorized: %w", lib.ErrUnauthorized)
+
+// checkResponse turns a failed answer from jsreport into an error naming the
+// status. jsreport answers an unauthenticated request with an empty body, and
+// unmarshalling that reports a json error, which hides what actually went wrong.
+func checkResponse(response *resty.Response) error {
+	if response.IsSuccess() {
+		return nil
+	}
+	if response.StatusCode() == http.StatusUnauthorized {
+		return ErrUnauthorized
+	}
+	var errorResponse ErrorResponse
+	if err := json.Unmarshal(response.Body(), &errorResponse); err == nil {
+		if errorResponse.Error.Message != "" {
+			return errors.New("jsreport-api: " + errorResponse.Message + " - " + errorResponse.Error.Message)
+		}
+	}
+	return fmt.Errorf("jsreport-api: unexpected status %v", response.StatusCode())
+}
+
 func NewJSReportClient(url string, port int64) *Client {
 	client := resty.New()
 	return &Client{Url: url, Port: port, BaseUrl: fmt.Sprintf("%v:%v", url, port), HttpClient: client}
@@ -50,6 +75,9 @@ func NewJSReportClient(url string, port int64) *Client {
 func (j *Client) GetTemplates(authString string) (templates []lib.Template, err error) {
 	response, err := j.HttpClient.R().SetHeader("Authorization", authString).Get(j.BaseUrl + "/odata/templates?$select=name,recipe")
 	if err != nil {
+		return
+	}
+	if err = checkResponse(response); err != nil {
 		return
 	}
 	var resp TemplateResponse
@@ -69,11 +97,18 @@ func (j *Client) GetTemplates(authString string) (templates []lib.Template, err 
 
 func (j *Client) GetTemplateById(templateId string, authString string) (template lib.Template, err error) {
 	response, err := j.HttpClient.R().SetHeader("Authorization", authString).Get(j.BaseUrl + "/odata/templates('" + templateId + "')")
+	if err != nil {
+		return
+	}
+	if err = checkResponse(response); err != nil {
+		return
+	}
 	var resp Template
-	err = json.Unmarshal(response.Body(), &resp)
+	if err = json.Unmarshal(response.Body(), &resp); err != nil {
+		return
+	}
 	jsData, err := j.getTemplateDataByShortId(resp.Data.ShortId, authString)
 	if err != nil {
-		fmt.Println(err.Error())
 		return
 	}
 	template.Id = resp.Id
@@ -159,16 +194,8 @@ func (j *Client) CreateReport(reportName string, templateName string, data map[s
 	if err != nil {
 		return
 	}
-	if response.StatusCode() != http.StatusOK {
-		if response.StatusCode() == http.StatusUnauthorized {
-			return "", "", "", errors.New("jsreport-unauthorized")
-		}
-		var errorResponse ErrorResponse
-		err = json.Unmarshal(response.Body(), &errorResponse)
-		if err != nil {
-			return
-		}
-		return "", "", "", errors.New("jsreport-api: " + errorResponse.Message + " - " + errorResponse.Error.Message)
+	if err = checkResponse(response); err != nil {
+		return "", "", "", err
 	}
 	reportLink = response.Header().Get("Permanent-Link")
 	reportType = response.Header().Get("Content-Type")
@@ -193,6 +220,9 @@ func (j *Client) GetReportContent(reportId string, authString string) (data []by
 	if err != nil {
 		return
 	}
+	if err = checkResponse(response); err != nil {
+		return nil, "", "", err
+	}
 	return response.Body(), response.Header().Get("Content-Type"), response.Header().Get("File-Extension"), err
 }
 
@@ -205,6 +235,9 @@ func (j *Client) GetTemplatePreview(id string, authString string) (data []byte, 
 		Post(j.BaseUrl + "/api/report")
 	if err != nil {
 		return
+	}
+	if err = checkResponse(response); err != nil {
+		return nil, "", "", err
 	}
 	return response.Body(), response.Header().Get("Content-Type"), response.Header().Get("File-Extension"), err
 }
@@ -219,18 +252,29 @@ func (j *Client) DeleteCreatedReportFile(reportId string, authString string) (er
 	if response.StatusCode() != http.StatusNoContent {
 		var errorResponse ErrorResponse
 		_ = json.Unmarshal(response.Body(), &errorResponse)
+		// a file jsreport does not know is already gone, which is what was wanted
 		if errorResponse.Error.Message == reportNotFoundErrorMessage(reportId) {
-			return
+			return nil
 		}
-		err = errors.New(errorResponse.Error.Message)
+		// not errorResponse.Error.Message directly: a rejected request comes back
+		// with an empty body, which would produce an error without a message
+		return checkResponse(response)
 	}
 	return
 }
 
 func (j *Client) getTemplateDataByShortId(id string, authString string) (data Data, err error) {
 	response, err := j.HttpClient.R().SetHeader("Authorization", authString).Get(j.BaseUrl + "/odata/data?$filter=" + url.QueryEscape("shortid eq '"+id+"'"))
+	if err != nil {
+		return
+	}
+	if err = checkResponse(response); err != nil {
+		return
+	}
 	var resp DataResponse
-	err = json.Unmarshal(response.Body(), &resp)
+	if err = json.Unmarshal(response.Body(), &resp); err != nil {
+		return
+	}
 	if len(resp.Data) > 0 {
 		data = resp.Data[0]
 	}

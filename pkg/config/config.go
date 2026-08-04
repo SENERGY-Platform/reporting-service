@@ -58,6 +58,15 @@ type Config struct {
 	Mail                    MailConfig     `json:"mail"`
 	SchedulerTickerDuration string         `json:"scheduler_ticker_duration" env_var:"SCHEDULER_TICKER_DURATION"`
 	MongoUrl                string         `json:"mongo_url" env_var:"MONGODB_URI"`
+	MongoDatabase           string         `json:"mongo_database" env_var:"MONGODB_DATABASE"`
+	// ReportJobWorkers is how many report files may be built at the same time. It
+	// bounds the load this service puts on jsreport and the timescale wrapper.
+	ReportJobWorkers int `json:"report_job_workers" env_var:"REPORT_JOB_WORKERS"`
+	// ReportJobRetention is how long a finished report job stays queryable.
+	ReportJobRetention string `json:"report_job_retention" env_var:"REPORT_JOB_RETENTION"`
+	// ReportJobStaleAfter is how long a running job may go without a heartbeat
+	// before it is treated as interrupted. Has to exceed the heartbeat interval.
+	ReportJobStaleAfter string `json:"report_job_stale_after" env_var:"REPORT_JOB_STALE_AFTER"`
 }
 
 func New(path string) (*Config, error) {
@@ -85,6 +94,10 @@ func New(path string) (*Config, error) {
 		},
 		SchedulerTickerDuration: "1m",
 		MongoUrl:                "mongodb://localhost:27017",
+		MongoDatabase:           "reporting",
+		ReportJobWorkers:        2,
+		ReportJobRetention:      "168h",
+		ReportJobStaleAfter:     "2m",
 	}
 	err := sb_config_hdl.Load(&cfg, nil, envTypeParser, nil, path)
 	return &cfg, err

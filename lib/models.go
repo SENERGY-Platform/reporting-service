@@ -19,6 +19,7 @@ package lib
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,6 +27,11 @@ import (
 
 	timescaleModels "github.com/SENERGY-Platform/timescale-wrapper/pkg/model"
 )
+
+// ErrUnauthorized reports that the report engine did not accept the token it was
+// given. It lives here so a handler can recognise it without depending on which
+// reporting driver produced it.
+var ErrUnauthorized = errors.New("report engine rejected the token")
 
 type Template struct {
 	Name string `json:"name,omitempty"`
@@ -94,6 +100,47 @@ type ReportFile struct {
 	Link      string    `json:"-"`
 	Type      string    `json:"type,omitempty"`
 	CreatedAt time.Time `json:"createdAt,omitempty"`
+}
+
+type ReportJobStatus string
+
+const (
+	ReportJobPending ReportJobStatus = "pending"
+	ReportJobRunning ReportJobStatus = "running"
+	ReportJobDone    ReportJobStatus = "done"
+	ReportJobFailed  ReportJobStatus = "failed"
+)
+
+// Steps a running report job reports back, so a client can show what is taking
+// the time.
+const (
+	ReportJobStepCollectingData = "collecting_data"
+	ReportJobStepRendering      = "rendering"
+	ReportJobStepEmailing       = "emailing"
+)
+
+// ReportJob tracks one asynchronous report file creation. Everything the worker
+// needs to run without the original request is stored on the job, so a queued job
+// survives a restart of the service.
+type ReportJob struct {
+	Id           string          `bson:"_id" json:"id,omitempty"`
+	ReportId     string          `json:"reportId,omitempty"`
+	Status       ReportJobStatus `json:"status,omitempty"`
+	Step         string          `json:"step,omitempty"`
+	ReportFileId string          `json:"reportFileId,omitempty"`
+	Error        string          `json:"error,omitempty"`
+	CreatedAt    time.Time       `json:"createdAt,omitempty"`
+	StartedAt    *time.Time      `json:"startedAt,omitempty"`
+	FinishedAt   *time.Time      `json:"finishedAt,omitempty"`
+	UserId       string          `json:"-"` // internal use
+	Request      Report          `json:"-"` // internal use
+	SendEmail    bool            `json:"-"` // internal use
+	Heartbeat    *time.Time      `json:"-"` // internal use
+}
+
+// Done reports whether the job reached a final state.
+func (j ReportJob) Done() bool {
+	return j.Status == ReportJobDone || j.Status == ReportJobFailed
 }
 
 type FromTo = struct {

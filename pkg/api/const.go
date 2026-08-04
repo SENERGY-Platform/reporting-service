@@ -29,4 +29,6 @@ const (
 const (
 	MessageSomethingWrong = "something went wrong"
 	MessageParseError     = "failed to parse request"
+	MessageJobNotFound    = "report job not found"
+	MessageUnauthorized   = "report engine rejected the authorization"
 )

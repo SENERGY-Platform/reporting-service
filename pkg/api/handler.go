@@ -20,6 +20,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/SENERGY-Platform/reporting-service/lib"
 	"github.com/SENERGY-Platform/reporting-service/pkg/report_engine"
@@ -27,20 +28,32 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// failed answers a request that could not be served. A token the report engine
+// rejected gets its own status, because that is a configuration problem a client
+// can act on rather than a generic failure it can only retry.
+func failed(c *gin.Context, message string, err error) {
+	util.Logger.Error(message, "error", err)
+	if errors.Is(err, lib.ErrUnauthorized) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": MessageUnauthorized})
+		return
+	}
+	_ = c.Error(errors.New(MessageSomethingWrong))
+}
+
 // getTemplates godoc
 // @Summary Get all templates
 // @Description	Gets all templates
 // @Tags Template
 // @Produce json
 // @Success	200 {array} lib.Template
+// @Failure	401 {string} str
 // @Failure	500 {string} str
 // @Router /templates [get]
 func getTemplates(reportingClient report_engine.Client) (string, string, gin.HandlerFunc) {
 	return http.MethodGet, "/templates", func(c *gin.Context) {
 		templates, err := reportingClient.GetTemplates(c.GetHeader(HeaderAuthorization))
 		if err != nil {
-			util.Logger.Error("could not get templates", "error", err)
-			_ = c.Error(errors.New(MessageSomethingWrong))
+			failed(c, "could not get templates", err)
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{
@@ -56,6 +69,7 @@ func getTemplates(reportingClient report_engine.Client) (string, string, gin.Han
 // @Produce json
 // @Param id path string true "Template ID"
 // @Success	200 {object} lib.Template
+// @Failure	401 {string} str
 // @Failure	500 {string} str
 // @Router /templates/:id [get]
 func getTemplate(reportingClient report_engine.Client) (string, string, gin.HandlerFunc) {
@@ -63,8 +77,7 @@ func getTemplate(reportingClient report_engine.Client) (string, string, gin.Hand
 		id := c.Param("id")
 		template, err := reportingClient.GetTemplateById(id, c.GetHeader(HeaderAuthorization))
 		if err != nil {
-			util.Logger.Error("could not get template "+id, "error", err)
-			_ = c.Error(errors.New(MessageSomethingWrong))
+			failed(c, "could not get template "+id, err)
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{
@@ -80,6 +93,7 @@ func getTemplate(reportingClient report_engine.Client) (string, string, gin.Hand
 // @Produce json
 // @Param id path string true "Template ID"
 // @Success	200
+// @Failure	401 {string} str
 // @Failure	500 {string} str
 // @Router /templates/preview/:id [get]
 func getTemplatePreview(reportingClient report_engine.Client) (string, string, gin.HandlerFunc) {
@@ -87,8 +101,7 @@ func getTemplatePreview(reportingClient report_engine.Client) (string, string, g
 		id := c.Param("id")
 		content, contentType, _, err := reportingClient.GetTemplatePreviewById(id, c.GetHeader(HeaderAuthorization))
 		if err != nil {
-			util.Logger.Error("could not get template preview"+id, "error", err)
-			_ = c.Error(errors.New(MessageSomethingWrong))
+			failed(c, "could not get template preview "+id, err)
 			return
 		}
 		c.Data(http.StatusOK, contentType, content)
@@ -96,12 +109,12 @@ func getTemplatePreview(reportingClient report_engine.Client) (string, string, g
 }
 
 // postReportCreate godoc
-// @Summary Create report file
-// @Description	Creates report file
+// @Summary Queue report file creation
+// @Description	Queues creation of a report file. Returns the id of the report and the id of the job that tracks the creation, which can be polled at /report/job/:jobId.
 // @Tags Report
 // @Produce json
 // @Param report body lib.Report true "Report"
-// @Success	200 {string} str
+// @Success	202 {object} map[string]string
 // @Failure	500 {string} str
 // @Router /report/create [post]
 func postReportCreate(reportingClient report_engine.Client) (string, string, gin.HandlerFunc) {
@@ -112,14 +125,78 @@ func postReportCreate(reportingClient report_engine.Client) (string, string, gin
 			_ = c.Error(errors.New(MessageSomethingWrong))
 			return
 		}
-		result, _, err := reportingClient.CreateReportFile(request, c.GetHeader(HeaderAuthorization))
+		reportId, jobId, err := reportingClient.EnqueueReportFileCreation(request, c.GetHeader(HeaderAuthorization))
 		if err != nil {
-			util.Logger.Error("could not create report file", "error", err)
+			util.Logger.Error("could not queue report file creation", "error", err)
+			_ = c.Error(errors.New(MessageSomethingWrong))
+			return
+		}
+		c.JSON(http.StatusAccepted, gin.H{
+			"id":    reportId,
+			"jobId": jobId,
+		})
+	}
+}
+
+// getReportJob godoc
+// @Summary Get report job by id
+// @Description	Gets the status of a queued report file creation
+// @Tags Report
+// @Produce json
+// @Param jobId path string true "Job ID"
+// @Success	200 {object} lib.ReportJob
+// @Failure	404 {string} str
+// @Failure	500 {string} str
+// @Router /report/job/:jobId [get]
+func getReportJob(reportingClient report_engine.Client) (string, string, gin.HandlerFunc) {
+	return http.MethodGet, "/report/job/:jobId", func(c *gin.Context) {
+		jobId := c.Param("jobId")
+		job, err := reportingClient.GetReportJob(jobId, c.GetHeader(HeaderAuthorization))
+		if errors.Is(err, report_engine.ErrJobNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": MessageJobNotFound})
+			return
+		}
+		if err != nil {
+			util.Logger.Error("could not get report job "+jobId, "error", err)
 			_ = c.Error(errors.New(MessageSomethingWrong))
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{
-			"id": result.Id,
+			"data": job,
+		})
+	}
+}
+
+// getReportJobs godoc
+// @Summary Get report jobs
+// @Description	Gets the most recent report jobs of the user, newest first
+// @Tags Report
+// @Produce json
+// @Param reportId query string false "only jobs of this report"
+// @Param limit query int false "maximum number of jobs to return"
+// @Success	200 {array} lib.ReportJob
+// @Failure	400 {string} str
+// @Failure	500 {string} str
+// @Router /report/job [get]
+func getReportJobs(reportingClient report_engine.Client) (string, string, gin.HandlerFunc) {
+	return http.MethodGet, "/report/job", func(c *gin.Context) {
+		var limit int64
+		if raw := c.Query("limit"); raw != "" {
+			parsed, err := strconv.ParseInt(raw, 10, 64)
+			if err != nil || parsed < 1 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid limit"})
+				return
+			}
+			limit = parsed
+		}
+		jobs, err := reportingClient.GetReportJobs(c.GetHeader(HeaderAuthorization), c.Query("reportId"), limit)
+		if err != nil {
+			util.Logger.Error("could not get report jobs", "error", err)
+			_ = c.Error(errors.New(MessageSomethingWrong))
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"data": jobs,
 		})
 	}
 }
@@ -253,6 +330,7 @@ func deleteReport(reportingClient report_engine.Client) (string, string, gin.Han
 // @Param reportId path string true "Report ID"
 // @Param fileId path string true "File ID"
 // @Success	200
+// @Failure	401 {string} str
 // @Failure	500 {string} str
 // @Router /report/file/:reportId/:fileId [get]
 func getReportFile(reportingClient report_engine.Client) (string, string, gin.HandlerFunc) {
@@ -261,8 +339,7 @@ func getReportFile(reportingClient report_engine.Client) (string, string, gin.Ha
 		fileId := c.Param("fileId")
 		content, contentType, _, err := reportingClient.DownloadReportFile(reportId, fileId, c.GetHeader(HeaderAuthorization))
 		if err != nil {
-			util.Logger.Error("could not get report file "+fileId, "error", err)
-			_ = c.Error(errors.New(MessageSomethingWrong))
+			failed(c, "could not get report file "+fileId, err)
 			return
 		}
 		c.Data(http.StatusOK, contentType, content)
@@ -274,6 +351,7 @@ func getReportFile(reportingClient report_engine.Client) (string, string, gin.Ha
 // @Description	Deletes report file by id
 // @Tags Report
 // @Success	204 {string} str
+// @Failure	401 {string} str
 // @Failure	500 {string} str
 // @Router /report/file/:reportId/:fileId [delete]
 func deleteReportFile(reportingClient report_engine.Client) (string, string, gin.HandlerFunc) {
@@ -282,8 +360,7 @@ func deleteReportFile(reportingClient report_engine.Client) (string, string, gin
 		fileId := c.Param("fileId")
 		err := reportingClient.DeleteCreatedReportFile(reportId, fileId, c.GetHeader(HeaderAuthorization))
 		if err != nil {
-			util.Logger.Error("could not delete report file "+fileId, "error", err)
-			_ = c.Error(errors.New(MessageSomethingWrong))
+			failed(c, "could not delete report file "+fileId, err)
 			return
 		}
 		c.Status(http.StatusNoContent)

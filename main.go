@@ -64,8 +64,25 @@ func main() {
 
 	client := report_engine.NewClient(jsreport.NewJSReportClient(cfg.JSReport.Url, cfg.JSReport.Port), cfg)
 
-	report_engine.InitDB(cfg.MongoUrl)
+	jobRetention, err := time.ParseDuration(cfg.ReportJobRetention)
+	if err != nil {
+		util.Logger.Error("invalid report job retention", "error", err)
+		ec = 1
+		return
+	}
+
+	if err = report_engine.InitDB(cfg.MongoUrl, cfg.MongoDatabase); err != nil {
+		util.Logger.Error("error connecting to database", "error", err)
+		ec = 1
+		return
+	}
 	defer report_engine.CloseDB()
+
+	if err = report_engine.EnsureIndexes(jobRetention); err != nil {
+		util.Logger.Error("error creating database indexes", "error", err)
+		ec = 1
+		return
+	}
 
 	httpHandler, err := api.CreateServer(cfg, client)
 	if err != nil {
@@ -102,20 +119,39 @@ func main() {
 
 	wg := &sync.WaitGroup{}
 
-	wg.Add(3)
+	wg.Add(4)
 
+	// Every goroutine below keeps its error local. They used to share the err of
+	// main, which raced as soon as two of them failed at the same time.
 	go func() {
 		defer wg.Done()
 		util.Logger.Info("init scheduler")
-		err = client.RunScheduler(ctx)
+		schedErr := client.RunScheduler(ctx)
 
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		if errors.Is(schedErr, context.Canceled) || errors.Is(schedErr, context.DeadlineExceeded) {
 			util.Logger.Info("scheduler exited normally")
 			return
 		}
 
-		if err != nil {
-			util.Logger.Error("could not start scheduler", "error", err)
+		if schedErr != nil {
+			util.Logger.Error("could not start scheduler", "error", schedErr)
+			ec = 1
+			cf()
+			return
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		workerErr := client.RunJobWorkers(ctx)
+
+		if errors.Is(workerErr, context.Canceled) || errors.Is(workerErr, context.DeadlineExceeded) {
+			util.Logger.Info("report job workers exited normally")
+			return
+		}
+
+		if workerErr != nil {
+			util.Logger.Error("could not start report job workers", "error", workerErr)
 			ec = 1
 			cf()
 			return
@@ -125,8 +161,8 @@ func main() {
 	go func() {
 		defer wg.Done()
 		util.Logger.Info("starting http server")
-		if err = httpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			util.Logger.Error("starting server failed", attributes.ErrorKey, err)
+		if serveErr := httpServer.ListenAndServe(); !errors.Is(serveErr, http.ErrServerClosed) {
+			util.Logger.Error("starting server failed", attributes.ErrorKey, serveErr)
 			ec = 1
 			cf()
 			return
@@ -139,8 +175,8 @@ func main() {
 		util.Logger.Info("stopping http server")
 		ctxWt, cf2 := context.WithTimeout(context.Background(), time.Second*5)
 		defer cf2()
-		if err = httpServer.Shutdown(ctxWt); err != nil {
-			util.Logger.Error("stopping server failed", attributes.ErrorKey, err)
+		if shutdownErr := httpServer.Shutdown(ctxWt); shutdownErr != nil {
+			util.Logger.Error("stopping server failed", attributes.ErrorKey, shutdownErr)
 			ec = 1
 		} else {
 			util.Logger.Info("http server stopped")
