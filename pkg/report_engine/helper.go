@@ -75,12 +75,9 @@ func ParseDuration(s string) (time.Duration, error) {
 			return 0, errors.New("unknown unit " + string(unit) + " in duration " + s)
 		}
 
-		// Add to total
-		if len(numStr) > 0 && numStr[0] == '-' {
-			total -= d
-		} else {
-			total += d
-		}
+		// ParseInt already applied the sign, so subtracting a negative value here
+		// would flip it back to positive.
+		total += d
 	}
 
 	return total, nil

@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/SENERGY-Platform/reporting-service/lib"
 	timescaleModels "github.com/SENERGY-Platform/timescale-wrapper/pkg/model"
@@ -58,19 +59,34 @@ func (s *Client) Query(authTokenString string, query timescaleModels.QueriesRequ
 	if err != nil {
 		return data, errors.New("senergy_db_v3.client - response unmarshal error: " + err.Error())
 	}
+	// A query that matched nothing comes back without any element or without any
+	// series, so neither index may be taken for granted.
+	if len(resp) == 0 || len(resp[0].Data) == 0 {
+		return data, nil
+	}
+	resultObject := ""
+	if queryOptions.ResultObject != nil {
+		resultObject = *queryOptions.ResultObject
+	}
 	for _, value := range resp[0].Data[0] {
-		if queryOptions.ResultObject != nil {
-			switch *queryOptions.ResultObject {
-			case "key":
-				data = append(data, value[*queryOptions.ResultKey])
-			case "array":
-				data = append(data, value)
-			default:
-				data = append(data, value[1])
+		switch resultObject {
+		case "key":
+			if queryOptions.ResultKey == nil {
+				return nil, errors.New("senergy_db_v3.client - result object 'key' needs a result key")
 			}
-		} else {
+			if *queryOptions.ResultKey < 0 || *queryOptions.ResultKey >= len(value) {
+				return nil, errors.New("senergy_db_v3.client - result key out of range: " + strconv.Itoa(*queryOptions.ResultKey))
+			}
+			data = append(data, value[*queryOptions.ResultKey])
+		case "array":
+			data = append(data, value)
+		default:
+			// column 0 is the time stamp, column 1 the value that was selected
+			if len(value) < 2 {
+				return nil, errors.New("senergy_db_v3.client - response row has no value column")
+			}
 			data = append(data, value[1])
 		}
 	}
-	return data, err
+	return data, nil
 }
