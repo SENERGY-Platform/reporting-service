@@ -1,42 +1,20 @@
 # reporting-service
 
-Generate swagger docs:
+Builds reports from the platform's time series and device data and renders them
+to files through jsreport. A report is a template plus typed data fields; fields
+can hold literal values or a query that this service resolves before rendering.
 
-    swag init -g api.go -o docs -dir pkg/api --parseDependency --ot json
+Reports are created on request or on a schedule, and the result is a file a user
+can download. Creation is **asynchronous** — collecting the data and rendering
+can each take minutes — so the API hands out a job and the client polls it.
 
-## Configuration Variables
+Written in Go. Reports, jobs and the queue live in MongoDB; the rendering itself
+happens in jsreport.
 
-- SENERGY_DB_URL
-- SENERGY_DB_PORT
-- JSREPORT_SERVER_URL
-- JSREPORT_SERVER_PORT
-- MONGODB_URI
-- MONGODB_DATABASE — database to store reports and report jobs in, default `reporting`
-- SCHEDULER_TICKER_DURATION — how often to look for due reports, default `1m`
-- REPORT_JOB_WORKERS — how many reports may be built at the same time, default `2`
-- REPORT_JOB_RETENTION — how long a finished report job stays queryable, default `168h`
-- REPORT_JOB_STALE_AFTER — when a running job without heartbeat counts as
-  interrupted, default `2m`. Has to stay above the 15s heartbeat interval.
+## Creating a report
 
-## Tests
-
-    go test ./...
-
-The tests around the report job queue need a mongodb. `docker compose up -d mongodb`
-provides one; set `MONGO_TEST_URL` to point somewhere else. They run against a
-separate `reporting_test` database and never touch the one the service uses.
-
-Without a mongodb those tests skip, which is also what `go test -short ./...` does.
-Set `REQUIRE_MONGO=1` to turn a missing database into a failure instead — CI does
-that so a broken service container cannot make the suite look green.
-
-## Creating reports
-
-Report creation is asynchronous, because collecting the data and rendering the file
-can both take a while.
-
-`POST /report/create` stores the report model, queues the actual work and answers
-`202` right away:
+`POST /report/create` stores the report model, queues the work and answers `202`
+right away:
 
 ```json
 {
@@ -45,7 +23,7 @@ can both take a while.
 }
 ```
 
-The job can then be polled at `GET /report/job/:jobId`:
+Poll the job at `GET /report/job/:jobId`:
 
 ```json
 {
@@ -60,204 +38,94 @@ The job can then be polled at `GET /report/job/:jobId`:
 }
 ```
 
-`status` is one of `pending`, `running`, `done` or `failed`. While running, `step`
-is `collecting_data`, `rendering` or `emailing`. A `done` job carries the
-`reportFileId` that `GET /report/file/:reportId/:fileId` serves, a `failed` job
+`status` is one of `pending`, `running`, `done` or `failed`. While running,
+`step` is `collecting_data`, `rendering` or `emailing`. A `done` job carries the
+`reportFileId` that `GET /report/file/:reportId/:fileId` serves; a `failed` job
 carries `error`.
 
-`GET /report/job?reportId=<id>&limit=<n>` lists the newest jobs of the calling user,
-which is how a client picks up the status again after a reload.
+`GET /report/job?reportId=<id>&limit=<n>` lists the newest jobs of the calling
+user, which is how a client picks the status up again after a reload.
 
 Scheduled reports go through the same queue, so both entry points share one
-concurrency limit against jsreport and the timescale wrapper.
+concurrency limit against jsreport and the Timescale wrapper.
 
-## jsreport reports
+## Configuration
 
-The reports of the jsreport folder `/senergy_reports` and `jsreport-sync`, the
-tool that keeps them in sync with an instance, live in
-[report-sync](https://github.com/SENERGY-Platform/report-sync).
+| Variable | Meaning |
+|---|---|
+| `SENERGY_DB_URL`, `SENERGY_DB_PORT` | the Timescale wrapper the report data is read from |
+| `JSREPORT_SERVER_URL`, `JSREPORT_SERVER_PORT` | the rendering service |
+| `MONGODB_URI` | connection for reports, jobs and the queue |
+| `MONGODB_DATABASE` | database name, default `reporting` |
+| `KEYCLOAK_CLIENT_ID` | the client this service exchanges its worker token as, default `reporting-service` |
+| `SCHEDULER_TICKER_DURATION` | how often to look for due reports, default `1m` |
+| `REPORT_JOB_WORKERS` | how many reports may be built at the same time, default `2` |
+| `REPORT_JOB_RETENTION` | how long a finished job stays queryable, default `168h` |
+| `REPORT_JOB_STALE_AFTER` | when a running job without heartbeat counts as interrupted, default `2m`. **Has to stay above the 15s heartbeat interval.** |
+
+## Tests
+
+```bash
+go test ./...
+```
+
+The tests around the report job queue need a MongoDB. `docker compose up -d mongodb`
+provides one; set `MONGO_TEST_URL` to point elsewhere. They run against a separate
+`reporting_test` database and never touch the one the service uses.
+
+Without a MongoDB those tests skip, which is also what `go test -short ./...` does.
+Set `REQUIRE_MONGO=1` to turn a missing database into a failure instead — CI does
+that, so a broken service container cannot make the suite look green.
+
+## API documentation
+
+Generated from the annotations:
+
+```bash
+swag init -g api.go -o docs -dir pkg/api --parseDependency --ot json
+```
+
+## jsreport templates
+
+The report templates are not part of this repository. This service assumes they
+exist in the jsreport instance it talks to.
 
 ## jsreport authentication
 
-This service forwards a user token to jsreport, which validates it through
-keycloak's token introspection endpoint. Since **keycloak 26.6.2** that endpoint
-only accepts a token whose `aud` contains the client doing the introspection —
-the fix for CVE-2026-37979. So `jsreport-api` has to be in the audience of every
-token that reaches jsreport.
+This service forwards a token to jsreport, which validates it through Keycloak's
+token introspection endpoint. Since **Keycloak 26.6.2** that endpoint only
+accepts a token whose `aud` contains the client doing the introspection — the fix
+for CVE-2026-37979. So **the client jsreport introspects as has to be in the
+audience of every token that reaches jsreport.**
 
-Two clients issue such tokens:
+Two paths carry such tokens, and both have to satisfy that:
 
-- `frontend` — the user token from the web ui, used for the template endpoints
-- `reporting-service` — the token the report job workers exchange, used for
-  creating report files and downloading them
+- the **user token** from the frontend, used for the template endpoints
+- the **worker token** this service exchanges (`KEYCLOAK_CLIENT_ID`), used for
+  creating and downloading report files
 
-Both need a client scope with an *Audience* mapper for `jsreport-api`, assigned as
-a default scope. Without it keycloak answers the introspection with
-`{"active": false}`, jsreport replies `401` with an empty body and this service
-logs `could not get templates ... jsreport-unauthorized`. Keycloak logs the reason:
+Each issuing client needs a client scope with an *Audience* mapper for jsreport's
+client, assigned as a default scope. Satisfying only one path leaves the other
+failing the same way under a different `token_issued_for` — which reads like an
+intermittent fault rather than a missing mapper.
+
+Without it, Keycloak answers the introspection with `{"active": false}`, jsreport
+replies `401` with an empty body, and this service logs
+`could not get templates ... jsreport-unauthorized`. The reason is only visible in
+Keycloak's own log:
 
     type="INTROSPECT_TOKEN_ERROR" error="invalid_token"
-    reason="Client 'jsreport-api' is not in the token audience" token_issued_for="frontend"
+    reason="Client '<jsreport client>' is not in the token audience"
+    token_issued_for="<issuing client>"
 
-## Example
-### GET /templates
-```json
-{
-  "data": [
-    {
-      "name": "test",
-      "id": "lNrdyWKHZnDQEP8X",
-      "data": {}
-    },
-    {
-      "name": "...",
-      "id": "...",
-      "data": {}
-    }
-  ]
-}
-```
+The concrete client names are deployment configuration and differ per
+installation, so they are not listed here.
 
-### GET /templates/:id
-```json
-{
-    "data": {
-        "name": "test",
-        "id": "lNrdyWKHZnDQEP8X",
-        "data": {
-            "name": "test-data",
-            "id": "aTwVzIETUniSJBkd",
-            "dataJsonString": "{\n    \"test\": \"test\",\n    \"test2\": {\"test3\": 2},\n    \"test4\": [{\"test5\": \"bla\"}],\n    \"test6\": \n    [\n        \n    ],\n    \"test8\": \n    [\n        \n    ]\n}",
-            "dataStructured": {
-                "test": {
-                    "name": "test",
-                    "valueType": "string"
-                },
-                "test2": {
-                    "name": "test2",
-                    "valueType": "object",
-                    "fields": {
-                        "test3": {
-                            "name": "test3",
-                            "valueType": "float64"
-                        }
-                    }
-                },
-                "test4": {
-                    "name": "test4",
-                    "valueType": "array",
-                    "length": 1,
-                    "children": {
-                        "0": {
-                            "name": "0",
-                            "valueType": "object",
-                            "fields": {
-                                "test5": {
-                                    "name": "test5",
-                                    "valueType": "string"
-                                }
-                            }
-                        }
-                    }
-                },
-                "test6": {
-                    "name": "test6",
-                    "valueType": "array"
-                },
-                "test8": {
-                    "name": "test8",
-                    "valueType": "array"
-                }
-            }
-        }
-    }
-}
-```
+## Further documentation
 
-### POST /report
-```json
-{
-  "id": "test",
-  "data": {
-    "test": {
-      "name": "test",
-      "valueType": "string",
-      "value": "test"
-    },
-    "test2": {
-      "name": "test2",
-      "valueType": "object",
-      "fields": {
-        "test3": {
-          "name": "test3",
-          "valueType": "int",
-          "value": 3
-        }
-      }
-    },
-    "test4": {
-      "name": "test4",
-      "valueType": "array",
-      "children": {
-        "test5": {
-          "name": "test5",
-          "valueType": "string",
-          "value": "blsssa"
-        },
-        "test7": {
-          "name": "test7",
-          "valueType": "int",
-          "value": 1
-        }
-      }
-    },
-    "test6": {
-      "name": "test6",
-      "valueType": "array",
-      "value": [
-        1,
-        2,
-        3,
-        4,
-        5
-      ]
-    },
-    "test8": {
-      "name": "test8",
-      "valueType": "array",
-      "query": {
-        "columns": [
-          {
-            "name": "energy.value",
-            "groupType": "difference-last"
-          }
-        ],
-        "time": {
-          "last": "12months"
-        },
-        "groupTime": "1months",
-        "serviceId": "urn:infai:ses:service:xy",
-        "deviceId": "urn:infai:ses:device:xy"
-      }
-    }
-  }
-}
-```
-actual payload to be sent to report server:
+`docs/` holds hand-written knowledge next to the generated `swagger.json`:
 
-```json
-{
-  "test": "test",
-  "test2": {
-    "test3": 3
-  },
-  "test4": [
-    {
-      "test5": "blsssa",
-      "test7": 1
-    }
-  ],
-  "test6": [1,2,3,4,5],
-  "test8": [1,2,3,4,5,6,7,8,9,10,11,12]
-}
-```
+- [report job design](docs/report-job-design.md) — the four decisions behind the
+  job model, including why there is no automatic retry
+- [payload examples](docs/payload-examples.md) — template and report payloads,
+  and what reaches the rendering service
