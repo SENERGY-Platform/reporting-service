@@ -70,7 +70,9 @@ func requireMongo(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test that needs mongodb")
 	}
-	initDBOnce.Do(func() { initDBErr = InitDB(mongoURL(), testDatabase) })
+	initDBOnce.Do(func() {
+		initDBErr = InitDB(&config.Config{MongoUrl: mongoURL(), MongoDatabase: testDatabase})
+	})
 	if initDBErr != nil {
 		if os.Getenv("REQUIRE_MONGO") != "" {
 			t.Fatalf("no mongodb at %s: %v", mongoURL(), initDBErr)

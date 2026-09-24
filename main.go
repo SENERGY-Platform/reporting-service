@@ -71,7 +71,7 @@ func main() {
 		return
 	}
 
-	if err = report_engine.InitDB(cfg.MongoUrl, cfg.MongoDatabase); err != nil {
+	if err = report_engine.InitDB(cfg); err != nil {
 		util.Logger.Error("error connecting to database", "error", err)
 		ec = 1
 		return

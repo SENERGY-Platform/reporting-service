@@ -55,13 +55,20 @@ concurrency limit against jsreport and the Timescale wrapper.
 |---|---|
 | `SENERGY_DB_URL`, `SENERGY_DB_PORT` | the Timescale wrapper the report data is read from |
 | `JSREPORT_SERVER_URL`, `JSREPORT_SERVER_PORT` | the rendering service |
-| `MONGODB_URI` | connection for reports, jobs and the queue |
-| `MONGODB_DATABASE` | database name, default `reporting` |
+| `MONGO_URL` | full connection string for reports, jobs and the queue, passed to the driver unchanged, default `mongodb://localhost:27017`. Logged with the config at startup, so it must not contain credentials. |
+| `MONGO_USER` | no authentication when empty, the default |
+| `MONGO_PASSWORD` | required when `MONGO_USER` is set; masked in the logged config |
+| `MONGO_AUTH_SOURCE` | database the user is defined in, default `admin`. When `MONGO_USER` is set, user, password and this replace any credentials, `authSource` and `authMechanism` in `MONGO_URL`; the mechanism is negotiated. |
+| `MONGO_DATABASE` | database name, default `reporting`; must not be empty |
 | `KEYCLOAK_CLIENT_ID` | the client this service exchanges its worker token as, default `reporting-service` |
 | `SCHEDULER_TICKER_DURATION` | how often to look for due reports, default `1m` |
 | `REPORT_JOB_WORKERS` | how many reports may be built at the same time, default `2` |
 | `REPORT_JOB_RETENTION` | how long a finished job stays queryable, default `168h` |
 | `REPORT_JOB_STALE_AFTER` | when a running job without heartbeat counts as interrupted, default `2m`. **Has to stay above the 15s heartbeat interval.** |
+
+Startup fails unless an authenticated `listCollections` on `MONGO_DATABASE`
+succeeds within 10 seconds, so wrong or missing credentials show up at start
+rather than on the first request.
 
 ## Tests
 
@@ -76,6 +83,19 @@ provides one; set `MONGO_TEST_URL` to point elsewhere. They run against a separa
 Without a MongoDB those tests skip, which is also what `go test -short ./...` does.
 Set `REQUIRE_MONGO=1` to turn a missing database into a failure instead — CI does
 that, so a broken service container cannot make the suite look green.
+
+`TestInitDBAuthenticates` runs only without `-short` and when
+`MONGO_AUTH_TEST_URL`, `MONGO_AUTH_TEST_USER` and `MONGO_AUTH_TEST_PASSWORD` are
+set. The user and password are root credentials of a throwaway server with access
+control; the test creates and removes its own users and databases there:
+
+```bash
+docker run -d --rm --name reporting-auth-test -p 127.0.0.1:27018:27017 \
+  -e MONGO_INITDB_ROOT_USERNAME=root -e MONGO_INITDB_ROOT_PASSWORD=rootpw mongo:8.2
+MONGO_AUTH_TEST_URL=mongodb://127.0.0.1:27018 MONGO_AUTH_TEST_USER=root \
+  MONGO_AUTH_TEST_PASSWORD=rootpw go test -run TestInitDBAuthenticates ./pkg/report_engine/
+docker stop reporting-auth-test
+```
 
 ## API documentation
 

@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/SENERGY-Platform/reporting-service/pkg/config"
 	"github.com/SENERGY-Platform/reporting-service/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -50,34 +51,89 @@ func dbCtx() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), dbOpTimeout)
 }
 
-// InitDB connects to mongodb and verifies that the connection is usable.
-func InitDB(url string, database string) error {
-	ctx, cancel := dbCtx()
-	defer cancel()
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(url))
+var (
+	errEmptyDatabase   = errors.New("mongo database name must not be empty")
+	errMissingPassword = errors.New("mongo password must not be empty when a mongo user is set")
+)
+
+// InitDB connects to mongodb and verifies that the configured credentials may
+// use the configured database.
+func InitDB(cfg *config.Config) error {
+	client, err := openDB(cfg, dbOpTimeout)
 	if err != nil {
-		return fmt.Errorf("could not connect to database: %w", err)
-	}
-	// Connect does not talk to the server, so without a ping a wrong url would
-	// only surface on the first report request.
-	if err = client.Ping(ctx, nil); err != nil {
-		return fmt.Errorf("could not reach database: %w", err)
+		return err
 	}
 	DB = client
-	if database != "" {
-		dbName = database
-	}
+	dbName = cfg.MongoDatabase
 	util.Logger.Info("connected to database", "database", dbName)
 	return nil
+}
+
+// openDB returns a connected client or none at all; it leaves the package state alone.
+func openDB(cfg *config.Config, timeout time.Duration) (*mongo.Client, error) {
+	opts, err := clientOptions(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return connect(opts, cfg.MongoDatabase, timeout)
+}
+
+// connect runs listCollections on the service database because Connect does not
+// talk to the server and ping needs no authentication.
+func connect(opts *options.ClientOptions, database string, timeout time.Duration) (*mongo.Client, error) {
+	connectCtx, cancelConnect := context.WithTimeout(context.Background(), timeout)
+	defer cancelConnect()
+	client, err := mongo.Connect(connectCtx, opts)
+	if err != nil {
+		return nil, fmt.Errorf("could not connect to database: %w", err)
+	}
+	checkCtx, cancelCheck := context.WithTimeout(context.Background(), timeout)
+	defer cancelCheck()
+	listOpts := options.ListCollections().SetNameOnly(true).SetAuthorizedCollections(true)
+	if _, err = client.Database(database).ListCollectionNames(checkCtx, bson.D{}, listOpts); err != nil {
+		disconnectCtx, cancelDisconnect := context.WithTimeout(context.Background(), timeout)
+		defer cancelDisconnect()
+		_ = client.Disconnect(disconnectCtx)
+		return nil, fmt.Errorf("mongo startup check failed: %w", err)
+	}
+	return client, nil
+}
+
+// clientOptions applies the credentials after the URI, so they replace user,
+// password, authSource and authMechanism given there.
+func clientOptions(cfg *config.Config) (*options.ClientOptions, error) {
+	if cfg.MongoDatabase == "" {
+		return nil, errEmptyDatabase
+	}
+	if cfg.MongoUser != "" && cfg.MongoPassword.Value() == "" {
+		return nil, errMissingPassword
+	}
+	opts := options.Client().ApplyURI(cfg.MongoUrl)
+	if cfg.MongoUser != "" {
+		opts.SetAuth(options.Credential{
+			Username:   cfg.MongoUser,
+			Password:   cfg.MongoPassword.Value(),
+			AuthSource: cfg.MongoAuthSource,
+		})
+	}
+	if err := opts.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid mongo client options: %w", err)
+	}
+	return opts, nil
 }
 
 // EnsureIndexes creates the indexes the report job queue relies on. Finished jobs
 // expire jobRetention after they completed; unfinished jobs carry no finishedat
 // and are therefore never removed by the ttl index.
 func EnsureIndexes(jobRetention time.Duration) error {
+	return ensureIndexes(ReportJobs(), jobRetention)
+}
+
+// ensureIndexes takes the collection so tests can use a client of their own.
+func ensureIndexes(jobs *mongo.Collection, jobRetention time.Duration) error {
 	ctx, cancel := dbCtx()
 	defer cancel()
-	_, err := ReportJobs().Indexes().CreateMany(ctx, []mongo.IndexModel{
+	_, err := jobs.Indexes().CreateMany(ctx, []mongo.IndexModel{
 		// listing a user's jobs, newest first
 		{Keys: bson.D{{Key: "userid", Value: 1}, {Key: "reportid", Value: 1}, {Key: "createdat", Value: -1}}},
 		// claiming the oldest pending job

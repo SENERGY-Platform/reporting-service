@@ -18,6 +18,7 @@ package config
 
 import (
 	sb_config_hdl "github.com/SENERGY-Platform/go-service-base/config-hdl"
+	sb_config_types "github.com/SENERGY-Platform/go-service-base/config-hdl/types"
 )
 
 type LoggerConfig struct {
@@ -57,8 +58,13 @@ type Config struct {
 	Keycloak                KeycloakConfig `json:"keycloak"`
 	Mail                    MailConfig     `json:"mail"`
 	SchedulerTickerDuration string         `json:"scheduler_ticker_duration" env_var:"SCHEDULER_TICKER_DURATION"`
-	MongoUrl                string         `json:"mongo_url" env_var:"MONGODB_URI"`
-	MongoDatabase           string         `json:"mongo_database" env_var:"MONGODB_DATABASE"`
+	// MongoUrl is passed to the driver unchanged and logged with the config, so
+	// credentials belong in MongoUser and MongoPassword.
+	MongoUrl        string                 `json:"mongo_url" env_var:"MONGO_URL"`
+	MongoUser       string                 `json:"mongo_user" env_var:"MONGO_USER"`
+	MongoPassword   sb_config_types.Secret `json:"mongo_password" env_var:"MONGO_PASSWORD"`
+	MongoAuthSource string                 `json:"mongo_auth_source" env_var:"MONGO_AUTH_SOURCE"`
+	MongoDatabase   string                 `json:"mongo_database" env_var:"MONGO_DATABASE"`
 	// ReportJobWorkers is how many report files may be built at the same time. It
 	// bounds the load this service puts on jsreport and the timescale wrapper.
 	ReportJobWorkers int `json:"report_job_workers" env_var:"REPORT_JOB_WORKERS"`
@@ -94,6 +100,7 @@ func New(path string) (*Config, error) {
 		},
 		SchedulerTickerDuration: "1m",
 		MongoUrl:                "mongodb://localhost:27017",
+		MongoAuthSource:         "admin",
 		MongoDatabase:           "reporting",
 		ReportJobWorkers:        2,
 		ReportJobRetention:      "168h",

@@ -52,7 +52,9 @@ func requireMongo(t *testing.T) {
 	if url == "" {
 		url = "mongodb://localhost:27017"
 	}
-	apiDBOnce.Do(func() { apiDBErr = report_engine.InitDB(url, apiTestDatabase) })
+	apiDBOnce.Do(func() {
+		apiDBErr = report_engine.InitDB(&config.Config{MongoUrl: url, MongoDatabase: apiTestDatabase})
+	})
 	if apiDBErr != nil {
 		if os.Getenv("REQUIRE_MONGO") != "" {
 			t.Fatalf("no mongodb at %s: %v", url, apiDBErr)
