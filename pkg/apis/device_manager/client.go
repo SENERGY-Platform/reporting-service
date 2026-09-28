@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	snrgyModels "github.com/SENERGY-Platform/models/go/models"
 	"github.com/go-resty/resty/v2"
@@ -50,4 +51,31 @@ func (s *Client) Query(authTokenString string) (data []snrgyModels.Device, err e
 	}
 	err = json.Unmarshal(response.Body(), &data)
 	return
+}
+
+// idsPerRequest keeps the ids filter well below common URL length limits.
+const idsPerRequest = 50
+
+// QueryByIds returns the given devices the token may read. The ids filter makes the
+// service ignore its default page size of 100.
+func (s *Client) QueryByIds(authTokenString string, ids []string) (data []snrgyModels.Device, err error) {
+	for start := 0; start < len(ids); start += idsPerRequest {
+		end := min(start+idsPerRequest, len(ids))
+		response, err := s.HttpClient.R().
+			SetHeader("Authorization", authTokenString).
+			SetQueryParam("ids", strings.Join(ids[start:end], ",")).
+			Get(s.BaseUrl + "/device-manager/devices")
+		if err != nil {
+			return nil, err
+		}
+		if response.StatusCode() != http.StatusOK {
+			return nil, errors.New("device_manager.client - response code error: " + response.String())
+		}
+		var page []snrgyModels.Device
+		if err = json.Unmarshal(response.Body(), &page); err != nil {
+			return nil, err
+		}
+		data = append(data, page...)
+	}
+	return data, nil
 }

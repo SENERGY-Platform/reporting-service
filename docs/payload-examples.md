@@ -188,3 +188,76 @@ becomes the resolved series. This is what a template is written against.
   "test8": [1,2,3,4,5,6,7,8,9,10,11,12]
 }
 ```
+
+### Device group queries
+
+A `query` can target a device group instead of a single device: it carries a
+`deviceGroupId`, and its column a `criteria` instead of a `name`. The Timescale
+wrapper answers with a list of series, each tagged with a `deviceId` and
+`serviceId`, and `queryOptions` decide how they reach the template:
+
+- `deviceGroupMode` is `aggregate` (the default) or `per_device`.
+- `aggregation` is `sum` (the default) or `mean`, and only applies to `aggregate`.
+  Missing values are skipped, not counted as zero.
+
+`aggregate` combines the first value column of every series into one series, so
+the result has the same shape as for a single device. With a `groupTime` the rows
+are matched by timestamp and ordered by time. Without one, `aggregate` needs a
+`limit` of 1 and combines the latest value of every device.
+`aggregate` rejects an `orderColumnIndex` other than 0, since series sorted by
+value cannot be merged. `per_device` needs `valueType` `array`.
+
+```json
+{
+  "consumption": {
+    "name": "consumption",
+    "valueType": "array",
+    "query": {
+      "deviceGroupId": "urn:infai:ses:device-group:xy",
+      "columns": [
+        {
+          "criteria": {
+            "function_id": "urn:infai:ses:measuring-function:xy",
+            "aspect_id": "urn:infai:ses:aspect:xy"
+          },
+          "groupType": "difference-last"
+        }
+      ],
+      "time": {
+        "last": "12months"
+      },
+      "groupTime": "1months"
+    },
+    "queryOptions": {
+      "deviceGroupMode": "per_device"
+    }
+  }
+}
+```
+
+With `per_device` the template receives one entry per series, in the order the
+wrapper returned them. `name`
+is the device's nickname, else its name, else its id; `values` follow
+`resultObject` as for a single device and are `[]` for a device without data.
+
+```json
+{
+  "consumption": [
+    {
+      "deviceId": "urn:infai:ses:device:a",
+      "serviceId": "urn:infai:ses:service:a",
+      "name": "Kitchen",
+      "values": [1, 2, 3]
+    },
+    {
+      "deviceId": "urn:infai:ses:device:b",
+      "serviceId": "urn:infai:ses:service:b",
+      "name": "urn:infai:ses:device:b",
+      "values": [4, 5, 6]
+    }
+  ]
+}
+```
+
+With `"deviceGroupMode": "aggregate", "aggregation": "sum"` the same object
+yields `"consumption": [5, 7, 9]`.

@@ -41,6 +41,7 @@ import (
 
 	"github.com/SENERGY-Platform/reporting-service/pkg/apis/senergy_db_v3"
 	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
+	timescaleModels "github.com/SENERGY-Platform/timescale-wrapper/pkg/model"
 	"github.com/google/uuid"
 	"github.com/robfig/cron/v3"
 	"go.mongodb.org/mongo-driver/bson"
@@ -217,11 +218,23 @@ func (r *Client) setReportFileData(data map[string]lib.ReportObject, authToken s
 				if err != nil {
 					return
 				}
-				responseData, err = r.DBClient.Query(authToken, *value.Query, *value.QueryOptions)
+				queryOptions := queryOptionsOf(value)
+				if value.Query.DeviceGroupId != nil {
+					var mode string
+					mode, err = queryOptions.GroupMode()
+					if err != nil {
+						return
+					}
+					if mode == lib.DeviceGroupModePerDevice {
+						return nil, errors.New("report object " + key + ": device group mode " + mode + " needs value type array")
+					}
+				}
+				var fetched int
+				responseData, fetched, err = r.DBClient.Query(authToken, *value.Query, queryOptions)
 				if err != nil {
 					return
 				}
-				dataPointsTSDBCounter.WithLabelValues(userId, reportId).Add(float64(len(responseData)))
+				dataPointsTSDBCounter.WithLabelValues(userId, reportId).Add(float64(fetched))
 				responseData = r.filterQueryValues(responseData)
 				if len(responseData) > 0 {
 					resultData[key] = responseData[0]
@@ -272,11 +285,27 @@ func (r *Client) setReportFileData(data map[string]lib.ReportObject, authToken s
 				if err != nil {
 					return nil, err
 				}
-				responseData, err = r.DBClient.Query(authToken, *value.Query, *value.QueryOptions)
+				queryOptions := queryOptionsOf(value)
+				if value.Query.DeviceGroupId != nil {
+					var mode string
+					mode, err = queryOptions.GroupMode()
+					if err != nil {
+						return
+					}
+					if mode == lib.DeviceGroupModePerDevice {
+						resultData[key], err = r.queryPerDevice(authToken, *value.Query, queryOptions, userId, reportId)
+						if err != nil {
+							return
+						}
+						continue
+					}
+				}
+				var fetched int
+				responseData, fetched, err = r.DBClient.Query(authToken, *value.Query, queryOptions)
 				if err != nil {
 					return
 				}
-				dataPointsTSDBCounter.WithLabelValues(userId, reportId).Add(float64(len(responseData)))
+				dataPointsTSDBCounter.WithLabelValues(userId, reportId).Add(float64(fetched))
 				responseData = r.filterQueryValues(responseData)
 				resultData[key] = responseData
 			} else if value.DeviceQuery != nil {
@@ -350,6 +379,72 @@ func (r *Client) setReportFileData(data map[string]lib.ReportObject, authToken s
 		}
 	}
 	return
+}
+
+// queryOptionsOf treats a query sent without options like one with empty options.
+func queryOptionsOf(object lib.ReportObject) lib.QueryOptions {
+	if object.QueryOptions == nil {
+		return lib.QueryOptions{}
+	}
+	return *object.QueryOptions
+}
+
+// queryPerDevice resolves a device group query into one entry per response element,
+// named like the devices of a device query.
+func (r *Client) queryPerDevice(authToken string, query timescaleModels.QueriesRequestElement, queryOptions lib.QueryOptions, userId string, reportId string) ([]lib.DeviceSeries, error) {
+	series, fetched, err := r.DBClient.QueryPerDevice(authToken, query, queryOptions)
+	if err != nil {
+		return nil, err
+	}
+	dataPointsTSDBCounter.WithLabelValues(userId, reportId).Add(float64(fetched))
+	names := r.deviceNames(authToken, series)
+	for i := range series {
+		series[i].Values = r.filterQueryValues(series[i].Values)
+		if series[i].Values == nil {
+			// templates iterate over values, which must not be null for a device without data
+			series[i].Values = []interface{}{}
+		}
+		series[i].Name = names[series[i].DeviceId]
+		if series[i].Name == "" {
+			series[i].Name = series[i].DeviceId
+		}
+	}
+	return series, nil
+}
+
+// deviceNames maps the ids of the given series to display names. Names are cosmetic,
+// so a failing lookup leaves every series with its id instead of failing the report.
+func (r *Client) deviceNames(authToken string, series []lib.DeviceSeries) map[string]string {
+	names := map[string]string{}
+	var ids []string
+	for _, entry := range series {
+		if _, seen := names[entry.DeviceId]; !seen {
+			names[entry.DeviceId] = ""
+			ids = append(ids, entry.DeviceId)
+		}
+	}
+	if len(ids) == 0 {
+		return names
+	}
+	devices, err := r.DeviceManager.QueryByIds(authToken, ids)
+	if err != nil {
+		util.Logger.Warn("could not resolve device names, using device ids", "error", err)
+		return names
+	}
+	for _, device := range devices {
+		names[device.Id] = deviceDisplayName(device)
+	}
+	return names
+}
+
+// deviceDisplayName prefers the shared nickname over the device name.
+func deviceDisplayName(device snrgyModels.Device) string {
+	for _, attr := range device.Attributes {
+		if attr.Key == "shared/nickname" && attr.Value != "" {
+			return attr.Value
+		}
+	}
+	return device.Name
 }
 
 func (r *Client) filterQueryValues(queryValues []interface{}) (filteredData []interface{}) {

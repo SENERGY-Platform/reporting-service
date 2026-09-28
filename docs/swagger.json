@@ -542,6 +542,14 @@
         "lib.QueryOptions": {
             "type": "object",
             "properties": {
+                "aggregation": {
+                    "description": "Aggregation is sum (default) or mean, used only in aggregate mode.",
+                    "type": "string"
+                },
+                "deviceGroupMode": {
+                    "description": "DeviceGroupMode is aggregate (default) or per_device, used only with a deviceGroupId.",
+                    "type": "string"
+                },
                 "endOffset": {
                     "type": "integer"
                 },

@@ -77,3 +77,68 @@ func TestReportJobDone(t *testing.T) {
 		}
 	}
 }
+
+func TestQueryOptionsGroupMode(t *testing.T) {
+	str := func(s string) *string { return &s }
+	cases := []struct {
+		name    string
+		mode    *string
+		want    string
+		wantErr bool
+	}{
+		{name: "defaults to aggregate", mode: nil, want: DeviceGroupModeAggregate},
+		{name: "accepts aggregate", mode: str("aggregate"), want: DeviceGroupModeAggregate},
+		{name: "accepts per_device", mode: str("per_device"), want: DeviceGroupModePerDevice},
+		{name: "rejects an empty mode", mode: str(""), wantErr: true},
+		{name: "rejects an unknown mode", mode: str("perDevice"), wantErr: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := QueryOptions{DeviceGroupMode: tc.mode}.GroupMode()
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("err = %v, want error %v", err, tc.wantErr)
+			}
+			if got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestQueryOptionsGroupAggregation(t *testing.T) {
+	str := func(s string) *string { return &s }
+	cases := []struct {
+		name        string
+		aggregation *string
+		want        string
+		wantErr     bool
+	}{
+		{name: "defaults to sum", aggregation: nil, want: AggregationSum},
+		{name: "accepts sum", aggregation: str("sum"), want: AggregationSum},
+		{name: "accepts mean", aggregation: str("mean"), want: AggregationMean},
+		{name: "rejects an unknown aggregation", aggregation: str("avg"), wantErr: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := QueryOptions{Aggregation: tc.aggregation}.GroupAggregation()
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("err = %v, want error %v", err, tc.wantErr)
+			}
+			if got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// The web ui is built against these exact keys.
+func TestDeviceSeriesJSONShape(t *testing.T) {
+	raw, err := json.Marshal(DeviceSeries{DeviceId: "d", ServiceId: "s", Name: "n", Values: []interface{}{1.5}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := `{"deviceId":"d","serviceId":"s","name":"n","values":[1.5]}`
+	if string(raw) != want {
+		t.Errorf("got %s, want %s", raw, want)
+	}
+}

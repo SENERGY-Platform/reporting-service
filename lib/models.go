@@ -71,6 +71,50 @@ type QueryOptions struct {
 	EndOffset        *int    `json:"endOffset,omitempty"`
 	ResultObject     *string `json:"resultObject,omitempty"`
 	ResultKey        *int    `json:"resultKey,omitempty"`
+	// DeviceGroupMode is aggregate (default) or per_device, used only with a deviceGroupId.
+	DeviceGroupMode *string `json:"deviceGroupMode,omitempty"`
+	// Aggregation is sum (default) or mean, used only in aggregate mode.
+	Aggregation *string `json:"aggregation,omitempty"`
+}
+
+const (
+	DeviceGroupModeAggregate = "aggregate"
+	DeviceGroupModePerDevice = "per_device"
+
+	AggregationSum  = "sum"
+	AggregationMean = "mean"
+)
+
+// GroupMode returns the device group mode, defaulting to aggregate.
+func (o QueryOptions) GroupMode() (string, error) {
+	if o.DeviceGroupMode == nil {
+		return DeviceGroupModeAggregate, nil
+	}
+	switch *o.DeviceGroupMode {
+	case DeviceGroupModeAggregate, DeviceGroupModePerDevice:
+		return *o.DeviceGroupMode, nil
+	}
+	return "", fmt.Errorf("unknown device group mode %q", *o.DeviceGroupMode)
+}
+
+// GroupAggregation returns how the devices of a group are combined, defaulting to sum.
+func (o QueryOptions) GroupAggregation() (string, error) {
+	if o.Aggregation == nil {
+		return AggregationSum, nil
+	}
+	switch *o.Aggregation {
+	case AggregationSum, AggregationMean:
+		return *o.Aggregation, nil
+	}
+	return "", fmt.Errorf("unknown aggregation %q", *o.Aggregation)
+}
+
+// DeviceSeries is one entry of a device group query in per_device mode.
+type DeviceSeries struct {
+	DeviceId  string        `json:"deviceId"`
+	ServiceId string        `json:"serviceId"`
+	Name      string        `json:"name"`
+	Values    []interface{} `json:"values"`
 }
 
 type DeviceQuery struct {
