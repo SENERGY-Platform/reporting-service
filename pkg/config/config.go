@@ -36,9 +36,9 @@ type SNRGYConfig struct {
 }
 
 type KeycloakConfig struct {
-	Url          string `json:"url" env_var:"KEYCLOAK_URL"`
-	ClientId     string `json:"client_id" env_var:"KEYCLOAK_CLIENT_ID"`
-	ClientSecret string `json:"client_secret" env_var:"KEYCLOAK_CLIENT_SECRET"`
+	Url          string                 `json:"url" env_var:"KEYCLOAK_URL"`
+	ClientId     string                 `json:"client_id" env_var:"KEYCLOAK_CLIENT_ID"`
+	ClientSecret sb_config_types.Secret `json:"client_secret" env_var:"KEYCLOAK_CLIENT_SECRET"`
 }
 
 type MailConfig struct {

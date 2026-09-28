@@ -243,3 +243,32 @@ func TestConfigJSONMasksTheMongoPassword(t *testing.T) {
 		t.Errorf("config JSON leaks the password: %s", s)
 	}
 }
+
+// main logs the whole config as JSON at startup.
+func TestConfigJSONMasksTheKeycloakClientSecret(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(`{"keycloak": {"client_secret": "s3cr3t-client"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := New(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := sb_util.ToJsonStr(cfg); strings.Contains(s, "s3cr3t-client") {
+		t.Errorf("config JSON leaks the keycloak client secret: %s", s)
+	}
+	if cfg.Keycloak.ClientSecret.Value() != "s3cr3t-client" {
+		t.Errorf("keycloak client secret from the file = %q, want s3cr3t-client", cfg.Keycloak.ClientSecret.Value())
+	}
+}
+
+func TestNewReadsKeycloakClientSecretFromTheEnvironment(t *testing.T) {
+	t.Setenv("KEYCLOAK_CLIENT_SECRET", "s3cr3t-from-env")
+	cfg, err := New("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Keycloak.ClientSecret.Value() != "s3cr3t-from-env" {
+		t.Errorf("keycloak client secret from the environment = %q, want s3cr3t-from-env", cfg.Keycloak.ClientSecret.Value())
+	}
+}

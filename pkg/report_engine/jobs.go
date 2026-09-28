@@ -264,7 +264,7 @@ func (r *Client) executeJob(ctx context.Context, job lib.ReportJob) {
 	token, _, err := jwt.ExchangeUserToken(
 		r.Config.Keycloak.Url,
 		r.Config.Keycloak.ClientId,
-		r.Config.Keycloak.ClientSecret,
+		r.Config.Keycloak.ClientSecret.Value(),
 		job.UserId,
 	)
 	if err != nil {
