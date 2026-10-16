@@ -4,7 +4,7 @@ go 1.26.1
 
 require (
 	github.com/SENERGY-Platform/connection-log v0.0.22
-	github.com/SENERGY-Platform/gin-middleware v0.14.1
+	github.com/SENERGY-Platform/gin-middleware v0.14.2
 	github.com/SENERGY-Platform/go-service-base/config-hdl v1.2.0
 	github.com/SENERGY-Platform/go-service-base/srv-info-hdl v0.2.0
 	github.com/SENERGY-Platform/go-service-base/struct-logger v0.8.0
