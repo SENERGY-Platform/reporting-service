@@ -33,7 +33,6 @@ import (
 	"github.com/SENERGY-Platform/reporting-service/pkg/apis/connection_log"
 	"github.com/SENERGY-Platform/reporting-service/pkg/apis/device_manager"
 	jsreportModels "github.com/SENERGY-Platform/reporting-service/pkg/apis/jsreport/models"
-	"github.com/SENERGY-Platform/reporting-service/pkg/apis/senergy_devices"
 	"github.com/SENERGY-Platform/reporting-service/pkg/config"
 	"github.com/SENERGY-Platform/reporting-service/pkg/util"
 	"github.com/prometheus/client_golang/prometheus"
@@ -58,7 +57,6 @@ var dataPointsTSDBCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 type Client struct {
 	Driver        ReportingDriver
 	DBClient      *senergy_db_v3.Client
-	DevicesClient *senergy_devices.Client
 	Config        *config.Config
 	DeviceManager *device_manager.Client
 	ConnectionLog *connection_log.Client
@@ -79,10 +77,6 @@ func NewClient(driver ReportingDriver, config *config.Config) *Client {
 		config.SNRGY.Url,
 		config.SNRGY.Port,
 	)
-	devicesClient := senergy_devices.NewClient(
-		config.SNRGY.Url,
-		config.SNRGY.Port,
-	)
 	deviceManagerClient := device_manager.NewClient(
 		config.SNRGY.Url,
 		config.SNRGY.Port,
@@ -91,7 +85,7 @@ func NewClient(driver ReportingDriver, config *config.Config) *Client {
 		config.SNRGY.Url,
 		config.SNRGY.Port,
 	)
-	return &Client{Driver: driver, DBClient: dbClient, DevicesClient: devicesClient, Config: config, DeviceManager: deviceManagerClient, ConnectionLog: connectionLogClient, jobs: newJobQueue()}
+	return &Client{Driver: driver, DBClient: dbClient, Config: config, DeviceManager: deviceManagerClient, ConnectionLog: connectionLogClient, jobs: newJobQueue()}
 }
 
 // GetTemplates retrieves a list of available report templates.
