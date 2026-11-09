@@ -203,11 +203,11 @@ func getReportJobs(reportingClient report_engine.Client) (string, string, gin.Ha
 
 // postReport godoc
 // @Summary Create report model
-// @Description	Creates report model
+// @Description	Creates report model. Returns the id it was stored under, which the caller cannot know: it is assigned here and a second save without it would store another report.
 // @Tags Report
 // @Produce json
 // @Param report body lib.Report true "Report"
-// @Success	200 {string} str
+// @Success	200 {object} map[string]string
 // @Failure	500 {string} str
 // @Router /report [post]
 func postReport(reportingClient report_engine.Client) (string, string, gin.HandlerFunc) {
@@ -218,13 +218,13 @@ func postReport(reportingClient report_engine.Client) (string, string, gin.Handl
 			_ = c.Error(errors.New(MessageSomethingWrong))
 			return
 		}
-		_, err := reportingClient.SaveReportModel(request, c.GetHeader(HeaderAuthorization))
+		saved, err := reportingClient.SaveReportModel(request, c.GetHeader(HeaderAuthorization))
 		if err != nil {
 			util.Logger.Error("could not save report", "error", err)
 			_ = c.Error(errors.New(MessageSomethingWrong))
 			return
 		}
-		c.Status(http.StatusOK)
+		c.JSON(http.StatusOK, gin.H{"id": saved.Id})
 	}
 }
 

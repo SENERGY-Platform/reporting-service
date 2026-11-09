@@ -76,7 +76,7 @@
                 }
             },
             "post": {
-                "description": "Creates report model",
+                "description": "Creates report model. Returns the id it was stored under, which the caller cannot know: it is assigned here and a second save without it would store another report.",
                 "produces": [
                     "application/json"
                 ],
@@ -99,7 +99,10 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "string"
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
                     "500": {

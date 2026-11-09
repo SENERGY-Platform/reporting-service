@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -173,6 +174,35 @@ func TestPostReportCreateAcceptsWithoutRendering(t *testing.T) {
 	jobId, _ := body["jobId"].(string)
 	if jobId == "" {
 		t.Error("no job id in the response, the ui polls with it")
+	}
+}
+
+// TestPostReportAnswersWithTheStoredId is the contract the web ui depends on: the id is
+// assigned here, and without it in the answer a second save of the same form stores another
+// report instead of updating the one just created.
+func TestPostReportAnswersWithTheStoredId(t *testing.T) {
+	engine := testServer(t)
+
+	rec := do(t, engine, http.MethodPost, "/report", `{"name":"Verbrauch","templateName":"consumption"}`, "user-1")
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body %q", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	id, _ := decode(t, rec)["id"].(string)
+	if id == "" {
+		t.Fatal("no report id in the response, the ui has no id to update with")
+	}
+
+	list := decode(t, do(t, engine, http.MethodGet, "/report", "", "user-1"))
+	stored, _ := list["data"].([]any)
+	ids := make([]string, 0, len(stored))
+	for _, entry := range stored {
+		report, _ := entry.(map[string]any)
+		storedId, _ := report["id"].(string)
+		ids = append(ids, storedId)
+	}
+	if !slices.Contains(ids, id) {
+		t.Errorf("the answered id %q is not among the stored reports %v", id, ids)
 	}
 }
 
