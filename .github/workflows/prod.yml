@@ -8,54 +8,117 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  multi:
+  version:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.tag_version.outputs.new_tag }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
-      - name: Login to DockerHub
-        uses: docker/login-action@v1
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v1
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.CR_PAT }}
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: actions/checkout@v4
       - name: Bump version and push tag
         id: tag_version
         uses: mathieudutour/github-tag-action@v6.1
         with:
           release_branches: ".*"
           github_token: ${{ secrets.GITHUB_TOKEN }}
-            # Replace all the occurrences of '{version}' with the version
+
+  # Builds each platform on a native runner of its own, arm64 without QEMU. The version is
+  # written into the sources at build time and not committed, so the image is built here
+  # and not by docker/github-builder, which builds the Git state and would lose it.
+  build:
+    needs: version
+    strategy:
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Replace version in docs/swagger.json
         uses: richardrigutins/replace-in-files@v2
         with:
           files: 'docs/swagger.json'
           search-text: '{version}'
-          replacement-text: ${{ steps.tag_version.outputs.new_tag }}
+          replacement-text: ${{ needs.version.outputs.tag }}
       - name: Replace version in main.go
         uses: richardrigutins/replace-in-files@v2
         with:
           files: 'main.go'
           search-text: '{version}'
-          replacement-text: ${{ steps.tag_version.outputs.new_tag }}
-      - name: Build and push
-        uses: docker/build-push-action@v2
+          replacement-text: ${{ needs.version.outputs.tag }}
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.CR_PAT }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
-          push: true
-          tags: |
-            smartenergyplatform/reporting-service:prod
-            ghcr.io/senergy-platform/reporting-service:prod
-            smartenergyplatform/reporting-service:${{ steps.tag_version.outputs.new_tag }}
-            ghcr.io/senergy-platform/reporting-service:${{ steps.tag_version.outputs.new_tag }}
-            smartenergyplatform/reporting-service:latest
-            ghcr.io/senergy-platform/reporting-service:latest
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,"name=smartenergyplatform/reporting-service,ghcr.io/senergy-platform/reporting-service",push-by-digest=true,name-canonical=true,push=true
+      - name: Export digest
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          digest='${{ steps.build.outputs.digest }}'
+          touch "$RUNNER_TEMP/digests/${digest#sha256:}"
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.runner }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digest-*
+          merge-multiple: true
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.CR_PAT }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Put both platforms under the tags
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          VERSION: ${{ needs.version.outputs.tag }}
+        run: |
+          docker buildx imagetools create --tag smartenergyplatform/reporting-service:prod --tag smartenergyplatform/reporting-service:$VERSION --tag smartenergyplatform/reporting-service:latest $(printf 'smartenergyplatform/reporting-service@sha256:%s ' *)
+          docker buildx imagetools inspect smartenergyplatform/reporting-service:$VERSION
+          docker buildx imagetools create --tag ghcr.io/senergy-platform/reporting-service:prod --tag ghcr.io/senergy-platform/reporting-service:$VERSION --tag ghcr.io/senergy-platform/reporting-service:latest $(printf 'ghcr.io/senergy-platform/reporting-service@sha256:%s ' *)
+          docker buildx imagetools inspect ghcr.io/senergy-platform/reporting-service:$VERSION
