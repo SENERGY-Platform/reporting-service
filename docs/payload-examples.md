@@ -347,11 +347,15 @@ What the template receives as `consumption`, here for a run on 2026-11-23:
 ## Writing templates
 
 Needs `TEMPLATE_FOLDER` and `TEMPLATE_AUTHOR_ROLE` (otherwise `404`) and the
-realm role in the caller's token (otherwise `403`). Fields the body does not
+realm role in the caller's token (otherwise `403`). A caller works in the
+subfolder `TEMPLATE_FOLDER/<group>`, where `<group>` is the value of the claim
+`TEMPLATE_GROUP_CLAIM` (default `group`) in the token, for example
+`custom_reports/acme`. The group needs read and edit permission on that
+subfolder. Fields the body does not
 list, such as `engine` or `scripts`, are refused with `400`. Every call to
 jsreport carries the caller's token, so jsreport's permissions decide.
 
-`POST /templates` creates the sample data and the template in the folder and
+`POST /templates` creates the sample data and the template in the group's folder and
 links them. The data entity is named `<name> data`. `recipe` is `chrome-pdf` or
 `html-to-xlsx`, the engine is always handlebars. The answer is `201` with the
 template as in `GET /templates/:id`.
@@ -402,7 +406,7 @@ preview. The check is textual, so the name in a comment or a string is refused t
 
 `PUT /templates/:id` takes the same body and answers `200`, `DELETE /templates/:id`
 removes template and sample data and answers `204`. Both only work on a template
-in the template folder, and a sample data entity elsewhere is left alone (an update
+in the group's folder, and a sample data entity elsewhere is left alone (an update
 then gives the template a new one). Names are unique per folder across templates and
 data, compared without regard to case, and are checked before anything is written.
 An update writes the template, then the sample data, and writes the template back if
@@ -416,10 +420,11 @@ tell the reasons apart:
 | 400 | the reason, for example `name is longer than 100 characters` | invalid input |
 | 401 | `report engine rejected the authorization` | jsreport did not accept the token |
 | 403 | `the template author role is missing` | the token lacks `TEMPLATE_AUTHOR_ROLE` |
-| 403 | `template folder not readable` | the caller cannot see the folder `TEMPLATE_FOLDER` |
+| 403 | `the account has no report group` | the claim `TEMPLATE_GROUP_CLAIM` is missing or empty in the token |
+| 403 | `template folder not readable` | the caller cannot see `TEMPLATE_FOLDER` or its subfolder for the group |
 | 403 | `no write access to the template folder` | creating was refused by jsreport |
 | 403 | `no write access to the template` | changing or deleting was refused by jsreport |
-| 403 | `only templates in the template folder can be changed` | the template lies elsewhere |
+| 403 | `only templates in the template folder can be changed` | the template lies outside the group's folder, for example in another group's |
 | 403 | `report engine denied access` | a preview was refused by jsreport |
 | 404 | `writing templates is not configured` | `TEMPLATE_FOLDER` or the role is not set |
 | 404 | `template not found` | the id is unknown or the caller may not read it |

@@ -56,6 +56,7 @@ type ReportingDriver interface {
 // report engine decides what that caller may touch.
 type TemplateAuthoring interface {
 	FindFolderShortId(name string, authString string) (string, error)
+	FindSubfolderShortId(parentShortId string, name string, authString string) (string, error)
 	CreateTemplate(folderShortId string, input lib.TemplateInput, authString string) (lib.Template, error)
 	UpdateTemplate(folderShortId string, id string, input lib.TemplateInput, authString string) (lib.Template, error)
 	DeleteTemplate(folderShortId string, id string, authString string) error

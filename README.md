@@ -56,7 +56,8 @@ concurrency limit against jsreport and the Timescale wrapper.
 | `SENERGY_DB_URL`, `SENERGY_DB_PORT` | the Timescale wrapper the report data is read from |
 | `FIGURES_URL` | the figures service including the gateway's path for it, for example `https://gateway.example/figures`. Empty by default, which makes a report object with a `figuresQuery` fail. |
 | `FIGURES_TIMEOUT` | how long a call to figures and to the device repository may take for a `figuresQuery`, default `2m` |
-| `TEMPLATE_FOLDER` | name of the jsreport folder templates are created in, looked up with the caller's token. Empty by default. |
+| `TEMPLATE_FOLDER` | name of the jsreport folder that holds one subfolder per report group, looked up with the caller's token. Empty by default. |
+| `TEMPLATE_GROUP_CLAIM` | token claim whose value is the name of the caller's subfolder of `TEMPLATE_FOLDER`, default `group`. It is the claim jsreport reads the caller's group from. |
 | `TEMPLATE_AUTHOR_ROLE` | realm role a caller needs to create, change, delete and preview templates. Empty by default. While either value is empty, those endpoints answer `404`. |
 | `JSREPORT_SERVER_URL`, `JSREPORT_SERVER_PORT` | the rendering service |
 | `MONGO_URL` | full connection string for reports, jobs and the queue, passed to the driver unchanged, default `mongodb://localhost:27017`. Logged with the config at startup, so it must not contain credentials. |
@@ -119,8 +120,10 @@ role can write handlebars templates through `POST /templates`,
 `PUT /templates/:id` and `DELETE /templates/:id`, and render a draft with
 `POST /templates/preview` without saving it. Every call to jsreport carries the
 caller's own token, so jsreport's permissions decide what that caller may touch.
-The calling user needs edit permission on the folder, since jsreport only lets a
-non-admin create in a folder that lists them. Payloads are in
+A caller works in the subfolder of `TEMPLATE_FOLDER` named like the value of the
+`TEMPLATE_GROUP_CLAIM` claim in their token (`custom_reports/<group>`), and can
+change nothing outside it. The group needs edit permission on that subfolder,
+since jsreport only lets a non-admin create in a folder that lists them. Payloads are in
 [payload examples](docs/payload-examples.md#writing-templates).
 
 ## jsreport authentication

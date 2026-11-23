@@ -31,6 +31,7 @@ import (
 const (
 	MessageTemplatesNotConfigured = "writing templates is not configured"
 	MessageTemplateFolder         = "template folder not readable"
+	MessageNoReportGroup          = "the account has no report group"
 	MessageForbidden              = "report engine denied access"
 	MessageTemplateNotFound       = "template not found"
 	MessageRoleMissing            = "the template author role is missing"
@@ -75,6 +76,8 @@ func templateFailed(c *gin.Context, message string, forbidden string, err error)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": MessageUnauthorized})
 	case errors.Is(err, lib.ErrTemplateFolderAccess):
 		c.JSON(http.StatusForbidden, gin.H{"error": MessageTemplateFolder})
+	case errors.Is(err, lib.ErrNoReportGroup):
+		c.JSON(http.StatusForbidden, gin.H{"error": MessageNoReportGroup})
 	case errors.Is(err, lib.ErrOutsideTemplateFolder):
 		c.JSON(http.StatusForbidden, gin.H{"error": MessageOutsideFolder})
 	case errors.Is(err, lib.ErrForbidden):
@@ -106,7 +109,7 @@ func invalidInput(c *gin.Context, err error) {
 
 // postTemplate godoc
 // @Summary Create template
-// @Description	Creates a handlebars template in the configured folder, with a data entity holding the sample data, using the caller's token. Needs the realm role from TEMPLATE_AUTHOR_ROLE, 404 while TEMPLATE_FOLDER or the role is not configured.
+// @Description	Creates a handlebars template in the caller's group folder (the subfolder of TEMPLATE_FOLDER named like the token's TEMPLATE_GROUP_CLAIM), with a data entity holding the sample data, using the caller's token. Needs the realm role from TEMPLATE_AUTHOR_ROLE, 404 while TEMPLATE_FOLDER or the role is not configured.
 // @Tags Template
 // @Accept json
 // @Produce json
@@ -144,7 +147,7 @@ func postTemplate(reportingClient report_engine.Client) (string, string, gin.Han
 
 // putTemplate godoc
 // @Summary Update template
-// @Description	Replaces name, recipe, content, helpers and sample data of a template in the template folder with the caller's token. A template elsewhere is a 403. Nothing is changed unless the name is free and both writes can be made. Needs the realm role from TEMPLATE_AUTHOR_ROLE.
+// @Description	Replaces name, recipe, content, helpers and sample data of a template in the caller's group folder with the caller's token. A template elsewhere is a 403. Nothing is changed unless the name is free and both writes can be made. Needs the realm role from TEMPLATE_AUTHOR_ROLE.
 // @Tags Template
 // @Accept json
 // @Produce json
@@ -184,7 +187,7 @@ func putTemplate(reportingClient report_engine.Client) (string, string, gin.Hand
 
 // deleteTemplate godoc
 // @Summary Delete template
-// @Description	Deletes a template in the template folder and its sample data with the caller's token. A template elsewhere is a 403. Needs the realm role from TEMPLATE_AUTHOR_ROLE.
+// @Description	Deletes a template in the caller's group folder and its sample data with the caller's token. A template elsewhere is a 403. Needs the realm role from TEMPLATE_AUTHOR_ROLE.
 // @Tags Template
 // @Param id path string true "Template ID"
 // @Success	204 {string} str

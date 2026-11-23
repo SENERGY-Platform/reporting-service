@@ -26,8 +26,10 @@ var (
 	ErrConflict             = errors.New("already exists in the report engine")
 	ErrRejected             = errors.New("report engine rejected the input")
 	ErrTemplateFolderAccess = errors.New("template folder not readable")
-	// ErrOutsideTemplateFolder means the template exists but not in the configured folder.
+	// ErrOutsideTemplateFolder means the template exists but not in the caller's folder.
 	ErrOutsideTemplateFolder = errors.New("only templates in the template folder can be changed")
+	// ErrNoReportGroup means the caller's token has no group claim to pick a folder by.
+	ErrNoReportGroup = errors.New("the account has no report group")
 )
 
 // TemplateInput is what an author sends to create or replace a template. The

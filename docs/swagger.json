@@ -407,7 +407,7 @@
                 }
             },
             "post": {
-                "description": "Creates a handlebars template in the configured folder, with a data entity holding the sample data, using the caller's token. Needs the realm role from TEMPLATE_AUTHOR_ROLE, 404 while TEMPLATE_FOLDER or the role is not configured.",
+                "description": "Creates a handlebars template in the caller's group folder (the subfolder of TEMPLATE_FOLDER named like the token's TEMPLATE_GROUP_CLAIM), with a data entity holding the sample data, using the caller's token. Needs the realm role from TEMPLATE_AUTHOR_ROLE, 404 while TEMPLATE_FOLDER or the role is not configured.",
                 "consumes": [
                     "application/json"
                 ],
@@ -522,7 +522,7 @@
                 }
             },
             "put": {
-                "description": "Replaces name, recipe, content, helpers and sample data of a template in the template folder with the caller's token. A template elsewhere is a 403. Nothing is changed unless the name is free and both writes can be made. Needs the realm role from TEMPLATE_AUTHOR_ROLE.",
+                "description": "Replaces name, recipe, content, helpers and sample data of a template in the caller's group folder with the caller's token. A template elsewhere is a 403. Nothing is changed unless the name is free and both writes can be made. Needs the realm role from TEMPLATE_AUTHOR_ROLE.",
                 "consumes": [
                     "application/json"
                 ],
@@ -597,7 +597,7 @@
                 }
             },
             "delete": {
-                "description": "Deletes a template in the template folder and its sample data with the caller's token. A template elsewhere is a 403. Needs the realm role from TEMPLATE_AUTHOR_ROLE.",
+                "description": "Deletes a template in the caller's group folder and its sample data with the caller's token. A template elsewhere is a 403. Needs the realm role from TEMPLATE_AUTHOR_ROLE.",
                 "tags": [
                     "Template"
                 ],

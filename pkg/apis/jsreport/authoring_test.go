@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -547,6 +548,44 @@ func TestFindFolderNotListedIsNotReadable(t *testing.T) {
 
 	if !errors.Is(err, lib.ErrTemplateFolderAccess) {
 		t.Fatalf("err = %v, want template folder not readable", err)
+	}
+}
+
+func TestFindSubfolderFiltersByNameAndParent(t *testing.T) {
+	client, rec := newRecordingJSReport(t, map[string]reply{
+		"GET /odata/folders": {http.StatusOK, `{"value":[{"shortid":"sub","name":"g1","folder":{"shortid":"parent"}}]}`},
+	})
+
+	got, err := client.FindSubfolderShortId("parent", "g1", "Bearer caller")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got != "sub" {
+		t.Errorf("folder = %q, want sub", got)
+	}
+	call := rec.find(http.MethodGet, "/odata/folders")
+	query, _ := url.QueryUnescape(call.Query)
+	if call.Auth != "Bearer caller" || !strings.Contains(query, "name eq 'g1' and folder/shortid eq 'parent'") {
+		t.Errorf("call = %+v, want the token and both conditions in the filter", call)
+	}
+}
+
+func TestFindSubfolderNotListedOrOfAnotherParentIsNotReadable(t *testing.T) {
+	for name, body := range map[string]string{
+		"not listed":       `{"value":[]}`,
+		"another parent":   `{"value":[{"shortid":"sub","name":"g1","folder":{"shortid":"elsewhere"}}]}`,
+		"no parent at all": `{"value":[{"shortid":"sub","name":"g1"}]}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			client, _ := newRecordingJSReport(t, map[string]reply{"GET /odata/folders": {http.StatusOK, body}})
+
+			_, err := client.FindSubfolderShortId("parent", "g1", "Bearer caller")
+
+			if !errors.Is(err, lib.ErrTemplateFolderAccess) {
+				t.Fatalf("err = %v, want template folder not readable", err)
+			}
+		})
 	}
 }
 

@@ -119,6 +119,30 @@ func (j *Client) FindFolderShortId(name string, authString string) (string, erro
 	return found, nil
 }
 
+// FindSubfolderShortId looks a folder up by name below the folder with parentShortId,
+// with the caller's token. Like FindFolderShortId it reports an unlisted folder as not readable.
+func (j *Client) FindSubfolderShortId(parentShortId string, name string, authString string) (string, error) {
+	filter := "name eq " + odataQuote(name) + " and folder/shortid eq " + odataQuote(parentShortId)
+	response, err := j.HttpClient.R().SetHeader("Authorization", authString).
+		Get(j.BaseUrl + "/odata/folders?$select=name,shortid,folder&$filter=" + url.QueryEscape(filter))
+	if err != nil {
+		return "", err
+	}
+	if err = checkWriteResponse(response); err != nil {
+		return "", err
+	}
+	var resp FolderResponse
+	if err = json.Unmarshal(response.Body(), &resp); err != nil {
+		return "", err
+	}
+	for _, folder := range resp.Folders {
+		if folder.ShortId != "" && folder.Parent.ShortId == parentShortId {
+			return folder.ShortId, nil
+		}
+	}
+	return "", fmt.Errorf("%w: %q", lib.ErrTemplateFolderAccess, name)
+}
+
 func dataName(templateName string) string {
 	return templateName + dataNameSuffix
 }

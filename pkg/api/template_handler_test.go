@@ -36,6 +36,11 @@ import (
 type authoringDriver struct {
 	stubDriver
 	folder      string
+	parent      string
+	group       string
+	subErr      error
+	createdIn   string
+	templateIn  map[string]string
 	created     []lib.TemplateInput
 	folderErr   error
 	createErr   error
@@ -53,21 +58,33 @@ func (d *authoringDriver) FindFolderShortId(name string, _ string) (string, erro
 	d.folder = name
 	return "fshort", d.folderErr
 }
-func (d *authoringDriver) CreateTemplate(_ string, input lib.TemplateInput, _ string) (lib.Template, error) {
+func (d *authoringDriver) FindSubfolderShortId(parent string, name string, _ string) (string, error) {
+	d.parent = parent
+	d.group = name
+	return "sub-" + name, d.subErr
+}
+func (d *authoringDriver) CreateTemplate(folder string, input lib.TemplateInput, _ string) (lib.Template, error) {
 	if d.createErr != nil {
 		return lib.Template{}, d.createErr
 	}
+	d.createdIn = folder
 	d.created = append(d.created, input)
 	return lib.Template{Id: "t1", Name: input.Name, Type: "PDF"}, nil
 }
 func (d *authoringDriver) UpdateTemplate(folder string, id string, input lib.TemplateInput, _ string) (lib.Template, error) {
 	d.updatedIn = folder
+	if in, ok := d.templateIn[id]; ok && in != folder {
+		return lib.Template{}, fmt.Errorf("%w: template %s", lib.ErrOutsideTemplateFolder, id)
+	}
 	if d.changeErr != nil {
 		return lib.Template{}, d.changeErr
 	}
 	return lib.Template{Id: id, Name: input.Name}, nil
 }
-func (d *authoringDriver) DeleteTemplate(_ string, id string, _ string) error {
+func (d *authoringDriver) DeleteTemplate(folder string, id string, _ string) error {
+	if in, ok := d.templateIn[id]; ok && in != folder {
+		return fmt.Errorf("%w: template %s", lib.ErrOutsideTemplateFolder, id)
+	}
 	if d.changeErr != nil {
 		return d.changeErr
 	}
@@ -101,16 +118,21 @@ func authoringServer(t *testing.T, driver report_engine.ReportingDriver, templat
 }
 
 func configured() config.TemplateConfig {
-	return config.TemplateConfig{Folder: "custom", AuthorRole: testAuthorRole}
+	return config.TemplateConfig{Folder: "custom", AuthorRole: testAuthorRole, GroupClaim: "group"}
 }
 
+// bearerWithRoles carries the group claim "g1", so the caller has a report group.
 func bearerWithRoles(userId string, roles ...string) string {
+	return bearerWithClaims(map[string]any{"sub": userId, "group": "g1", "realm_access": map[string]any{"roles": roles}})
+}
+
+func bearerWithClaims(claims map[string]any) string {
 	enc := func(v any) string {
 		b, _ := json.Marshal(v)
 		return base64.RawURLEncoding.EncodeToString(b)
 	}
 	return "Bearer " + enc(map[string]string{"alg": "none", "typ": "JWT"}) + "." +
-		enc(map[string]any{"sub": userId, "realm_access": map[string]any{"roles": roles}}) + ".signature"
+		enc(claims) + ".signature"
 }
 
 func send(t *testing.T, engine *gin.Engine, method string, path string, body string, authorization string) *httptest.ResponseRecorder {
@@ -191,7 +213,7 @@ func TestListingTemplatesDoesNotNeedTheRole(t *testing.T) {
 	}
 }
 
-func TestPostTemplateCreatesInTheConfiguredFolder(t *testing.T) {
+func TestPostTemplateCreatesInTheCallersGroupFolder(t *testing.T) {
 	driver := &authoringDriver{}
 	engine := authoringServer(t, driver, configured())
 
@@ -202,6 +224,9 @@ func TestPostTemplateCreatesInTheConfiguredFolder(t *testing.T) {
 	}
 	if driver.folder != "custom" || len(driver.created) != 1 || driver.created[0].Name != "Verbrauch" {
 		t.Errorf("folder %q, created %+v", driver.folder, driver.created)
+	}
+	if driver.parent != "fshort" || driver.group != "g1" || driver.createdIn != "sub-g1" {
+		t.Errorf("subfolder %q below %q, created in %q, want g1 below the configured folder", driver.group, driver.parent, driver.createdIn)
 	}
 	data, _ := decode(t, rec)["data"].(map[string]any)
 	if data["id"] != "t1" {
@@ -253,6 +278,72 @@ func TestPostTemplateWithAFolderTheCallerCannotReadIsNotAServerError(t *testing.
 
 	if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), MessageTemplateFolder) {
 		t.Errorf("status = %d body %q, want 403 template folder not readable", rec.Code, rec.Body.String())
+	}
+}
+
+func TestPostTemplateWithoutAGroupClaimIsRefused(t *testing.T) {
+	roles := map[string]any{"roles": []string{testAuthorRole}}
+	for name, claims := range map[string]map[string]any{
+		"claim missing": {"sub": "u1", "realm_access": roles},
+		"claim empty":   {"sub": "u1", "group": "  ", "realm_access": roles},
+		"not a string":  {"sub": "u1", "group": []string{"a"}, "realm_access": roles},
+		"other claim":   {"sub": "u1", "org": "g1", "realm_access": roles},
+	} {
+		t.Run(name, func(t *testing.T) {
+			driver := &authoringDriver{}
+			engine := authoringServer(t, driver, configured())
+
+			rec := send(t, engine, http.MethodPost, "/templates", validTemplate, bearerWithClaims(claims))
+
+			if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), MessageNoReportGroup) {
+				t.Errorf("status = %d body %q, want 403 %s", rec.Code, rec.Body.String(), MessageNoReportGroup)
+			}
+			if len(driver.created) != 0 || driver.group != "" {
+				t.Errorf("created %+v after looking up %q, want no lookup", driver.created, driver.group)
+			}
+		})
+	}
+}
+
+func TestPostTemplateReadsTheGroupFromTheConfiguredClaim(t *testing.T) {
+	driver := &authoringDriver{}
+	cfg := configured()
+	cfg.GroupClaim = "org"
+	engine := authoringServer(t, driver, cfg)
+	token := bearerWithClaims(map[string]any{"sub": "u1", "group": "g1", "org": "acme", "realm_access": map[string]any{"roles": []string{testAuthorRole}}})
+
+	rec := send(t, engine, http.MethodPost, "/templates", validTemplate, token)
+
+	if rec.Code != http.StatusCreated || driver.createdIn != "sub-acme" {
+		t.Errorf("status = %d, created in %q, want sub-acme", rec.Code, driver.createdIn)
+	}
+}
+
+func TestPostTemplateWithoutASubfolderForTheGroupIsNotReadable(t *testing.T) {
+	driver := &authoringDriver{subErr: fmt.Errorf("%w: %q", lib.ErrTemplateFolderAccess, "g1")}
+	engine := authoringServer(t, driver, configured())
+
+	rec := send(t, engine, http.MethodPost, "/templates", validTemplate, bearerWithRoles("u1", testAuthorRole))
+
+	if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), MessageTemplateFolder) {
+		t.Errorf("status = %d body %q, want 403 template folder not readable", rec.Code, rec.Body.String())
+	}
+}
+
+func TestChangingATemplateOfAnotherGroupsFolderIsRefused(t *testing.T) {
+	driver := &authoringDriver{templateIn: map[string]string{"t9": "sub-other"}}
+	engine := authoringServer(t, driver, configured())
+	token := bearerWithRoles("u1", testAuthorRole)
+
+	for method, body := range map[string]string{http.MethodPut: validTemplate, http.MethodDelete: ""} {
+		rec := send(t, engine, method, "/templates/t9", body, token)
+
+		if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), MessageOutsideFolder) {
+			t.Errorf("%s status = %d body %q, want 403 %s", method, rec.Code, rec.Body.String(), MessageOutsideFolder)
+		}
+	}
+	if len(driver.deleted) != 0 {
+		t.Errorf("deleted = %v, want nothing", driver.deleted)
 	}
 }
 

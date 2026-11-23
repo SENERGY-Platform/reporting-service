@@ -321,13 +321,18 @@ func TestNewTemplateAuthoringIsOffByDefaultAndReadsTheEnvironment(t *testing.T) 
 		t.Error("writing templates must be off without configuration")
 	}
 
+	if cfg.Templates.GroupClaim != "group" {
+		t.Errorf("group claim = %q, want group by default", cfg.Templates.GroupClaim)
+	}
+
 	t.Setenv("TEMPLATE_FOLDER", "folder-a")
 	t.Setenv("TEMPLATE_AUTHOR_ROLE", "role-a")
+	t.Setenv("TEMPLATE_GROUP_CLAIM", "org")
 	cfg, err = New("")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Templates.Folder != "folder-a" || cfg.Templates.AuthorRole != "role-a" || !cfg.Templates.Enabled() {
+	if cfg.Templates.Folder != "folder-a" || cfg.Templates.AuthorRole != "role-a" || cfg.Templates.GroupClaim != "org" || !cfg.Templates.Enabled() {
 		t.Errorf("templates = %+v", cfg.Templates)
 	}
 }

@@ -50,6 +50,9 @@ type TemplateConfig struct {
 	Folder string `json:"folder" env_var:"TEMPLATE_FOLDER"`
 	// AuthorRole is the realm role a caller needs to write templates.
 	AuthorRole string `json:"author_role" env_var:"TEMPLATE_AUTHOR_ROLE"`
+	// GroupClaim is the token claim whose value names the caller's subfolder of Folder.
+	// It is the claim jsreport reads the caller's group from.
+	GroupClaim string `json:"group_claim" env_var:"TEMPLATE_GROUP_CLAIM"`
 }
 
 // Enabled reports whether templates may be written at all.
@@ -113,6 +116,9 @@ func New(path string) (*Config, error) {
 		},
 		Figures: FiguresConfig{
 			Timeout: "2m",
+		},
+		Templates: TemplateConfig{
+			GroupClaim: "group",
 		},
 		Keycloak: KeycloakConfig{
 			Url:          "http://localhost",

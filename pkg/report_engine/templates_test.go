@@ -17,6 +17,8 @@
 package report_engine
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -33,6 +35,9 @@ type previewDriver struct {
 }
 
 func (d *previewDriver) FindFolderShortId(string, string) (string, error) { return "f", nil }
+func (d *previewDriver) FindSubfolderShortId(string, string, string) (string, error) {
+	return "fsub", nil
+}
 func (d *previewDriver) CreateTemplate(string, lib.TemplateInput, string) (lib.Template, error) {
 	return lib.Template{}, nil
 }
@@ -50,12 +55,22 @@ func (d *previewDriver) RenderInline(render lib.PreviewRender, data map[string]i
 }
 
 func previewClient(driver ReportingDriver) *Client {
-	return &Client{Driver: driver, Config: &config.Config{}}
+	return &Client{Driver: driver, Config: &config.Config{Templates: config.TemplateConfig{GroupClaim: "group"}}}
 }
 
-func previewToken() string {
-	// a token without a role is enough here, the client does not check roles
-	return "Bearer eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1MSJ9.sig"
+func previewToken() string { return groupToken("g1") }
+
+// groupToken is an unsigned token whose group claim is group, empty for none.
+func groupToken(group string) string {
+	enc := func(v any) string {
+		b, _ := json.Marshal(v)
+		return base64.RawURLEncoding.EncodeToString(b)
+	}
+	claims := map[string]any{"sub": "u1"}
+	if group != "" {
+		claims["group"] = group
+	}
+	return "Bearer " + enc(map[string]string{"alg": "none"}) + "." + enc(claims) + ".sig"
 }
 
 func TestPreviewFillsTheDataLikeARunAndStoresNothing(t *testing.T) {
@@ -132,22 +147,24 @@ func TestDriverWithoutTemplateAuthoringIsReported(t *testing.T) {
 	}
 }
 
-func TestCreateTemplateLooksTheFolderUpByTheConfiguredName(t *testing.T) {
+func TestCreateTemplateLooksTheGroupFolderUpBelowTheConfiguredOne(t *testing.T) {
 	driver := &folderDriver{}
-	client := &Client{Driver: driver, Config: &config.Config{Templates: config.TemplateConfig{Folder: "custom_reports", AuthorRole: "r"}}}
+	client := &Client{Driver: driver, Config: &config.Config{Templates: config.TemplateConfig{Folder: "custom_reports", AuthorRole: "r", GroupClaim: "group"}}}
 
 	if _, err := client.CreateTemplate(lib.TemplateInput{Name: "n"}, previewToken()); err != nil {
 		t.Fatal(err)
 	}
 
-	if driver.looked != "custom_reports" || driver.createdIn != "folder-short" {
-		t.Errorf("looked up %q, created in %q", driver.looked, driver.createdIn)
+	if driver.looked != "custom_reports" || driver.parent != "folder-short" || driver.group != "g1" || driver.createdIn != "sub-g1" {
+		t.Errorf("looked up %q, then %q below %q, created in %q", driver.looked, driver.group, driver.parent, driver.createdIn)
 	}
 }
 
 type folderDriver struct {
 	previewDriver
 	looked    string
+	parent    string
+	group     string
 	createdIn string
 	updatedIn string
 	deletedIn string
@@ -162,10 +179,10 @@ func (d *folderDriver) DeleteTemplate(folder string, _ string, _ string) error {
 	return nil
 }
 
-// A change is checked against the folder named in the configuration, so it is looked up first.
-func TestUpdateAndDeleteAreCheckedAgainstTheConfiguredFolder(t *testing.T) {
+// A change is checked against the caller's group folder, so it is looked up first.
+func TestUpdateAndDeleteAreCheckedAgainstTheGroupFolder(t *testing.T) {
 	driver := &folderDriver{}
-	client := &Client{Driver: driver, Config: &config.Config{Templates: config.TemplateConfig{Folder: "custom_reports", AuthorRole: "r"}}}
+	client := &Client{Driver: driver, Config: &config.Config{Templates: config.TemplateConfig{Folder: "custom_reports", AuthorRole: "r", GroupClaim: "group"}}}
 
 	if _, err := client.UpdateTemplate("t1", lib.TemplateInput{Name: "n"}, previewToken()); err != nil {
 		t.Fatal(err)
@@ -174,7 +191,7 @@ func TestUpdateAndDeleteAreCheckedAgainstTheConfiguredFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if driver.looked != "custom_reports" || driver.updatedIn != "folder-short" || driver.deletedIn != "folder-short" {
+	if driver.looked != "custom_reports" || driver.updatedIn != "sub-g1" || driver.deletedIn != "sub-g1" {
 		t.Errorf("looked up %q, updated in %q, deleted in %q", driver.looked, driver.updatedIn, driver.deletedIn)
 	}
 }
@@ -183,7 +200,30 @@ func (d *folderDriver) FindFolderShortId(name string, _ string) (string, error) 
 	d.looked = name
 	return "folder-short", nil
 }
+func (d *folderDriver) FindSubfolderShortId(parent string, name string, _ string) (string, error) {
+	d.parent = parent
+	d.group = name
+	return "sub-" + name, nil
+}
 func (d *folderDriver) CreateTemplate(folder string, _ lib.TemplateInput, _ string) (lib.Template, error) {
 	d.createdIn = folder
 	return lib.Template{}, nil
+}
+
+func TestWithoutAGroupClaimNoFolderIsLookedUp(t *testing.T) {
+	driver := &folderDriver{}
+	client := &Client{Driver: driver, Config: &config.Config{Templates: config.TemplateConfig{Folder: "custom_reports", AuthorRole: "r", GroupClaim: "group"}}}
+
+	_, createErr := client.CreateTemplate(lib.TemplateInput{Name: "n"}, groupToken(""))
+	_, updateErr := client.UpdateTemplate("t1", lib.TemplateInput{Name: "n"}, groupToken(""))
+	deleteErr := client.DeleteTemplate("t1", groupToken(""))
+
+	for _, err := range []error{createErr, updateErr, deleteErr} {
+		if !errors.Is(err, lib.ErrNoReportGroup) {
+			t.Errorf("err = %v, want no report group", err)
+		}
+	}
+	if driver.looked != "" || driver.createdIn != "" {
+		t.Errorf("looked up %q and created in %q, want nothing", driver.looked, driver.createdIn)
+	}
 }

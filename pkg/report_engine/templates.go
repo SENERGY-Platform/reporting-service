@@ -17,10 +17,14 @@
 package report_engine
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/SENERGY-Platform/reporting-service/lib"
+	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
 )
 
 // ErrTemplateAuthoringUnavailable means the configured driver cannot write templates.
@@ -38,14 +42,58 @@ func (r *Client) templateDriver() (TemplateAuthoring, error) {
 	return driver, nil
 }
 
-// CreateTemplate creates a template in the configured folder. The folder is looked
+// groupOf reads the claim that names the caller's report group from the token. The
+// signature is not checked, as everywhere else the token is only read. A missing, empty
+// or non-string claim is no group.
+func groupOf(authString string, claim string) (string, error) {
+	if _, err := jwt.Parse(authString); err != nil {
+		return "", fmt.Errorf("%w: %w", lib.ErrUnauthorized, err)
+	}
+	raw := authString
+	if len(raw) > 7 && strings.ToLower(raw[:7]) == "bearer " {
+		raw = raw[7:]
+	}
+	parts := strings.Split(raw, ".")
+	if len(parts) != 3 {
+		return "", lib.ErrNoReportGroup
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(parts[1], "="))
+	if err != nil {
+		return "", lib.ErrNoReportGroup
+	}
+	var claims map[string]any
+	if err = json.Unmarshal(payload, &claims); err != nil {
+		return "", lib.ErrNoReportGroup
+	}
+	group, _ := claims[claim].(string)
+	if strings.TrimSpace(group) == "" {
+		return "", lib.ErrNoReportGroup
+	}
+	return group, nil
+}
+
+// templateFolder is the caller's folder: the subfolder of the configured folder named
+// like the caller's group claim. Both lookups use the caller's token.
+func (r *Client) templateFolder(driver TemplateAuthoring, authString string) (string, error) {
+	group, err := groupOf(authString, r.Config.Templates.GroupClaim)
+	if err != nil {
+		return "", err
+	}
+	parent, err := driver.FindFolderShortId(r.Config.Templates.Folder, authString)
+	if err != nil {
+		return "", err
+	}
+	return driver.FindSubfolderShortId(parent, group, authString)
+}
+
+// CreateTemplate creates a template in the caller's group folder. The folder is looked
 // up with the caller's token, so a caller who cannot read it gets no template.
 func (r *Client) CreateTemplate(input lib.TemplateInput, authString string) (lib.Template, error) {
 	driver, err := r.templateDriver()
 	if err != nil {
 		return lib.Template{}, err
 	}
-	folder, err := driver.FindFolderShortId(r.Config.Templates.Folder, authString)
+	folder, err := r.templateFolder(driver, authString)
 	if err != nil {
 		return lib.Template{}, err
 	}
@@ -53,13 +101,13 @@ func (r *Client) CreateTemplate(input lib.TemplateInput, authString string) (lib
 }
 
 // UpdateTemplate replaces a template and its sample data. Only templates in the
-// configured folder can be changed.
+// caller's group folder can be changed.
 func (r *Client) UpdateTemplate(id string, input lib.TemplateInput, authString string) (lib.Template, error) {
 	driver, err := r.templateDriver()
 	if err != nil {
 		return lib.Template{}, err
 	}
-	folder, err := driver.FindFolderShortId(r.Config.Templates.Folder, authString)
+	folder, err := r.templateFolder(driver, authString)
 	if err != nil {
 		return lib.Template{}, err
 	}
@@ -67,13 +115,13 @@ func (r *Client) UpdateTemplate(id string, input lib.TemplateInput, authString s
 }
 
 // DeleteTemplate removes a template and its sample data. Only templates in the
-// configured folder can be deleted.
+// caller's group folder can be deleted.
 func (r *Client) DeleteTemplate(id string, authString string) error {
 	driver, err := r.templateDriver()
 	if err != nil {
 		return err
 	}
-	folder, err := driver.FindFolderShortId(r.Config.Templates.Folder, authString)
+	folder, err := r.templateFolder(driver, authString)
 	if err != nil {
 		return err
 	}
