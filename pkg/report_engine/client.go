@@ -32,6 +32,8 @@ import (
 	"github.com/SENERGY-Platform/reporting-service/lib"
 	"github.com/SENERGY-Platform/reporting-service/pkg/apis/connection_log"
 	"github.com/SENERGY-Platform/reporting-service/pkg/apis/device_manager"
+	"github.com/SENERGY-Platform/reporting-service/pkg/apis/device_repository"
+	"github.com/SENERGY-Platform/reporting-service/pkg/apis/figures"
 	jsreportModels "github.com/SENERGY-Platform/reporting-service/pkg/apis/jsreport/models"
 	"github.com/SENERGY-Platform/reporting-service/pkg/config"
 	"github.com/SENERGY-Platform/reporting-service/pkg/util"
@@ -60,6 +62,12 @@ type Client struct {
 	Config        *config.Config
 	DeviceManager *device_manager.Client
 	ConnectionLog *connection_log.Client
+	// Figures and DeviceRepository are nil without FIGURES_URL, which makes a
+	// figuresQuery fail instead of calling a made-up address.
+	Figures          *figures.Client
+	DeviceRepository *device_repository.Client
+	// now is the clock of a run, replaceable in tests.
+	now func() time.Time
 	// jobs is shared between the api handlers and the report job workers. It is a
 	// pointer because gin handlers receive a copy of the Client.
 	jobs *jobQueue
@@ -85,7 +93,13 @@ func NewClient(driver ReportingDriver, config *config.Config) *Client {
 		config.SNRGY.Url,
 		config.SNRGY.Port,
 	)
-	return &Client{Driver: driver, DBClient: dbClient, Config: config, DeviceManager: deviceManagerClient, ConnectionLog: connectionLogClient, jobs: newJobQueue()}
+	client := &Client{Driver: driver, DBClient: dbClient, Config: config, DeviceManager: deviceManagerClient, ConnectionLog: connectionLogClient, jobs: newJobQueue()}
+	if config.Figures.Url != "" {
+		timeout := FiguresTimeout(config)
+		client.Figures = figures.NewClient(config.Figures.Url, timeout)
+		client.DeviceRepository = device_repository.NewClient(config.SNRGY.Url, config.SNRGY.Port, timeout)
+	}
+	return client
 }
 
 // GetTemplates retrieves a list of available report templates.
@@ -202,6 +216,15 @@ func (r *Client) setReportFileData(data map[string]lib.ReportObject, authToken s
 	}
 	userId := claims.GetUserId()
 	for key, value := range data {
+		if value.FiguresQuery != nil {
+			var figuresResult lib.FiguresResult
+			figuresResult, err = r.figuresData(authToken, *value.FiguresQuery)
+			if err != nil {
+				return nil, fmt.Errorf("report object %s: %w", key, err)
+			}
+			resultData[key] = figuresResult
+			continue
+		}
 		switch value.ValueType {
 		case "string", "int", "float", "float64":
 			if value.Value != nil {

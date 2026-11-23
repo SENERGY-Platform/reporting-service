@@ -542,6 +542,48 @@
                 }
             }
         },
+        "lib.FiguresPeriod": {
+            "type": "object",
+            "properties": {
+                "end": {
+                    "type": "string"
+                },
+                "kind": {
+                    "description": "Kind is previousDay, previousWeek (ISO, Monday first), previousMonth,\npreviousQuarter, previousYear, currentMonth, currentYear or fixed.",
+                    "type": "string"
+                },
+                "start": {
+                    "description": "Start and End are days as YYYY-MM-DD, the end day included. Only for fixed.",
+                    "type": "string"
+                },
+                "timeZone": {
+                    "description": "TimeZone is an IANA zone, default Europe/Berlin.",
+                    "type": "string"
+                }
+            }
+        },
+        "lib.FiguresQuery": {
+            "type": "object",
+            "properties": {
+                "carriers": {
+                    "description": "Carriers narrows the figures, default every carrier that occurs.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "graphId": {
+                    "type": "string"
+                },
+                "nodeId": {
+                    "description": "NodeId narrows the rows to this node and everything below it.",
+                    "type": "string"
+                },
+                "period": {
+                    "$ref": "#/definitions/lib.FiguresPeriod"
+                }
+            }
+        },
         "lib.QueryOptions": {
             "type": "object",
             "properties": {
@@ -707,6 +749,9 @@
                     "additionalProperties": {
                         "$ref": "#/definitions/lib.ReportObject"
                     }
+                },
+                "figuresQuery": {
+                    "$ref": "#/definitions/lib.FiguresQuery"
                 },
                 "length": {
                     "type": "integer"

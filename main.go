@@ -62,6 +62,12 @@ func main() {
 	util.Logger.Info(srvInfoHdl.Name(), "version", srvInfoHdl.Version())
 	util.Logger.Info("config: " + sb_util.ToJsonStr(cfg))
 
+	if _, err = report_engine.ParseFiguresTimeout(cfg); err != nil {
+		util.Logger.Error("invalid figures timeout", "error", err)
+		ec = 1
+		return
+	}
+
 	client := report_engine.NewClient(jsreport.NewJSReportClient(cfg.JSReport.Url, cfg.JSReport.Port), cfg)
 
 	jobRetention, err := time.ParseDuration(cfg.ReportJobRetention)

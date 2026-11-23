@@ -272,3 +272,42 @@ func TestNewReadsKeycloakClientSecretFromTheEnvironment(t *testing.T) {
 		t.Errorf("keycloak client secret from the environment = %q, want s3cr3t-from-env", cfg.Keycloak.ClientSecret.Value())
 	}
 }
+
+func TestNewFiguresUrlIsEmptyByDefault(t *testing.T) {
+	cfg, err := New("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Figures.Url != "" {
+		t.Errorf("figures url = %q, want empty", cfg.Figures.Url)
+	}
+}
+
+func TestNewReadsFiguresUrlFromTheEnvironment(t *testing.T) {
+	t.Setenv("FIGURES_URL", "https://gateway.example/figures")
+	cfg, err := New("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Figures.Url != "https://gateway.example/figures" {
+		t.Errorf("figures url = %q", cfg.Figures.Url)
+	}
+}
+
+func TestNewFiguresTimeout(t *testing.T) {
+	cfg, err := New("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Figures.Timeout != "2m" {
+		t.Errorf("figures timeout = %q, want 2m", cfg.Figures.Timeout)
+	}
+	t.Setenv("FIGURES_TIMEOUT", "30s")
+	cfg, err = New("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Figures.Timeout != "30s" {
+		t.Errorf("figures timeout = %q, want 30s", cfg.Figures.Timeout)
+	}
+}

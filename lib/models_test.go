@@ -18,6 +18,7 @@ package lib
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 )
@@ -140,5 +141,32 @@ func TestDeviceSeriesJSONShape(t *testing.T) {
 	want := `{"deviceId":"d","serviceId":"s","name":"n","values":[1.5]}`
 	if string(raw) != want {
 		t.Errorf("got %s, want %s", raw, want)
+	}
+}
+
+func TestReportObjectReadsAFiguresQuery(t *testing.T) {
+	raw := `{"name":"consumption","valueType":"object","figuresQuery":{"graphId":"g","nodeId":"n","carriers":["gas"],"period":{"kind":"fixed","start":"2026-01-01","end":"2026-01-31","timeZone":"UTC"}}}`
+	var object ReportObject
+	if err := json.Unmarshal([]byte(raw), &object); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	q := object.FiguresQuery
+	if q == nil || q.GraphId != "g" || *q.NodeId != "n" || q.Carriers[0] != "gas" {
+		t.Fatalf("figures query = %+v", q)
+	}
+	if q.Period.Kind != "fixed" || *q.Period.Start != "2026-01-01" || *q.Period.End != "2026-01-31" || *q.Period.TimeZone != "UTC" {
+		t.Errorf("period = %+v", q.Period)
+	}
+}
+
+// The web ui reads and writes the same model, so an object without the new field
+// must not grow it.
+func TestReportObjectWithoutAFiguresQueryDoesNotSerializeOne(t *testing.T) {
+	raw, err := json.Marshal(ReportObject{DataType: DataType{Name: "n", ValueType: "string"}, Value: "v"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(string(raw), "figuresQuery") {
+		t.Errorf("got %s", raw)
 	}
 }

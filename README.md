@@ -54,6 +54,8 @@ concurrency limit against jsreport and the Timescale wrapper.
 | Variable | Meaning |
 |---|---|
 | `SENERGY_DB_URL`, `SENERGY_DB_PORT` | the Timescale wrapper the report data is read from |
+| `FIGURES_URL` | the figures service including the gateway's path for it, for example `https://gateway.example/figures`. Empty by default, which makes a report object with a `figuresQuery` fail. |
+| `FIGURES_TIMEOUT` | how long a call to figures and to the device repository may take for a `figuresQuery`, default `2m` |
 | `JSREPORT_SERVER_URL`, `JSREPORT_SERVER_PORT` | the rendering service |
 | `MONGO_URL` | full connection string for reports, jobs and the queue, passed to the driver unchanged, default `mongodb://localhost:27017`. Logged with the config at startup, so it must not contain credentials. |
 | `MONGO_USER` | no authentication when empty, the default |

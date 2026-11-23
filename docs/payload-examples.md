@@ -261,3 +261,66 @@ is the device's nickname, else its name, else its id; `values` follow
 
 With `"deviceGroupMode": "aggregate", "aggregation": "sum"` the same object
 yields `"consumption": [5, 7, 9]`.
+
+### Figures queries
+
+An object with a `figuresQuery` is resolved from the figures service instead of the
+Timescale wrapper and needs `FIGURES_URL`. `valueType` is `object`, and the object
+turns into the form below. `period.kind` is `previousDay`, `previousWeek` (Monday
+first), `previousMonth`, `previousQuarter`, `previousYear`, `currentMonth`,
+`currentYear` or `fixed` with `start` and `end` as days, the end day included. A
+period is cut at midnight of `timeZone` (default `Europe/Berlin`) and a `current*`
+period ends at the start of the day of the run. `nodeId` narrows the rows to a node
+and what is below it, `carriers` the values.
+
+```json
+{
+  "consumption": {
+    "name": "consumption",
+    "valueType": "object",
+    "figuresQuery": {
+      "graphId": "urn:infai:ses:graph:xy",
+      "carriers": ["electricity", "gas"],
+      "period": { "kind": "previousMonth" }
+    }
+  }
+}
+```
+
+What the template receives as `consumption`, here for a run on 2026-11-23:
+
+```json
+{
+  "graph": { "id": "urn:infai:ses:graph:xy", "name": "Werk" },
+  "node": null,
+  "period": { "kind": "previousMonth", "start": "2026-10-01", "end": "2026-10-31", "timeZone": "Europe/Berlin" },
+  "carriers": ["electricity", "gas"],
+  "rows": [
+    { "nodeId": "n-site", "name": "Werk", "path": ["Werk"], "depth": 0, "values": { "electricity": 500.5, "gas": 60 }, "share": null, "alsoUnder": [] },
+    { "nodeId": "n-gas", "name": "Gaszaehler", "path": ["Werk", "Gaszaehler"], "depth": 1, "values": { "gas": 60 }, "share": 100, "alsoUnder": ["Halle"] }
+  ],
+  "meters": [
+    { "nodeId": "n-gas", "deviceId": "dev-gas", "name": "Gaszaehler", "status": "partial", "first": "2026-10-12", "last": "2026-10-31" }
+  ],
+  "generatedAt": "2026-11-23T15:30:00+01:00"
+}
+```
+
+- `rows` follow the tree depth first, children by name. `share` is the weight of the
+  edge to the parent the row stands under, in percent, and `null` for a top row.
+  A node the graph hangs under several parents appears once, under the first one
+  reached, and `alsoUnder` names the others, sorted, so sums over rows do not count
+  it twice. A detached node (edge weight 0) is a top row of its own, and a node
+  marked `dashboard/excluded` has neither a row nor a meter. `values` are kWh,
+  water in m³. A carrier a node never measured is absent.
+- `meters` has one entry per device node. `status` is `none` without readings,
+  `partial` if the first reading is more than a day after the start or the last more
+  than a day before the end, else `complete`. First and last are taken over all
+  registers of the meter, one that lacks an end does not hide the others. `first`
+  and `last` are days and absent where no register has that end.
+- A refusal of the graph by the device repository or figures (for example 403 on a
+  graph the report owner may not read) fails the run with a message naming the
+  service, the status and the start of the answer. Devices the owner may not read are
+  left out by figures without a sign in its answer, so their meter shows `none`.
+- Each call to the device repository and figures is bound by `FIGURES_TIMEOUT`,
+  default `2m`.

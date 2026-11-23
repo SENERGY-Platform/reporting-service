@@ -35,6 +35,14 @@ type SNRGYConfig struct {
 	Port int64  `json:"port" env_var:"SENERGY_DB_PORT"`
 }
 
+// FiguresConfig points at the figures service. It is only reachable through the
+// gateway, so the url includes the gateway's path for it. Empty disables figuresQuery.
+type FiguresConfig struct {
+	Url string `json:"url" env_var:"FIGURES_URL"`
+	// Timeout bounds a call to figures and to the device repository for a figures query.
+	Timeout string `json:"timeout" env_var:"FIGURES_TIMEOUT"`
+}
+
 type KeycloakConfig struct {
 	Url          string                 `json:"url" env_var:"KEYCLOAK_URL"`
 	ClientId     string                 `json:"client_id" env_var:"KEYCLOAK_CLIENT_ID"`
@@ -55,6 +63,7 @@ type Config struct {
 	Debug                   bool           `json:"debug" env_var:"DEBUG"`
 	JSReport                JSReportConfig `json:"jsreport"`
 	SNRGY                   SNRGYConfig    `json:"snrgy"`
+	Figures                 FiguresConfig  `json:"figures"`
 	Keycloak                KeycloakConfig `json:"keycloak"`
 	Mail                    MailConfig     `json:"mail"`
 	SchedulerTickerDuration string         `json:"scheduler_ticker_duration" env_var:"SCHEDULER_TICKER_DURATION"`
@@ -86,6 +95,9 @@ func New(path string) (*Config, error) {
 		SNRGY: SNRGYConfig{
 			Url:  "http://localhost",
 			Port: 80,
+		},
+		Figures: FiguresConfig{
+			Timeout: "2m",
 		},
 		Keycloak: KeycloakConfig{
 			Url:          "http://localhost",
