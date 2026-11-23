@@ -38,6 +38,9 @@ type Template struct {
 	Id   string `json:"id,omitempty"`
 	Data Data   `json:"data,omitempty"`
 	Type string `json:"type,omitempty"`
+	// Helpers is the author's handlebars helpers of a template written through
+	// /templates, without the fixed set the service puts in front of them.
+	Helpers string `json:"helpers,omitempty"`
 }
 
 type Data struct {

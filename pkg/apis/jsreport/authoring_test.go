@@ -169,6 +169,12 @@ func TestCreateTemplateLinksDataAndFolderWithTheCallersToken(t *testing.T) {
 	if _, ok := tpl.Body["scripts"]; ok {
 		t.Error("a template must not carry scripts")
 	}
+	if tpl.Body["helpers"] != lib.FixedTemplateHelpers+"\nfunction up(s){return s.toUpperCase()}" {
+		t.Errorf("stored helpers = %q, want the fixed helpers before the author's", tpl.Body["helpers"])
+	}
+	if template.Helpers != "function up(s){return s.toUpperCase()}" {
+		t.Errorf("answered helpers = %q, want the author's without the fixed set", template.Helpers)
+	}
 	if template.Id != "t1" || template.Type != "PDF" || template.Data.Id != "d1" || template.Data.DataJSONString != `{"title":"x"}` {
 		t.Errorf("template = %+v", template)
 	}
@@ -266,6 +272,38 @@ func TestUpdateTemplatePatchesTemplateAndData(t *testing.T) {
 	}
 	if template.Type != "Excel" || template.Name != "Verbrauch" || template.Data.Name != "Verbrauch data" {
 		t.Errorf("template = %+v", template)
+	}
+	if tpl.Body["helpers"] != lib.FixedTemplateHelpers+"\nfunction up(s){return s.toUpperCase()}" || template.Helpers != "function up(s){return s.toUpperCase()}" {
+		t.Errorf("helpers: patched %q, answered %q, want the fixed set once in front and the author's text answered", tpl.Body["helpers"], template.Helpers)
+	}
+}
+
+func TestGetTemplateByIdAnswersTheAuthorsHelpersWithoutTheFixedSet(t *testing.T) {
+	stored := `{"_id":"t1","shortid":"tshort","name":"Alt","recipe":"chrome-pdf","helpers":` + jsonQuote(lib.ComposeTemplateHelpers("function mine() {}")) + `,"data":{"shortid":"dshort"}}`
+	client, _ := newRecordingJSReport(t, map[string]reply{
+		"GET /odata/templates('t1')": {http.StatusOK, stored},
+		"GET /odata/data":            {http.StatusOK, storedData},
+	})
+
+	template, err := client.GetTemplateById("t1", "Bearer caller")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if template.Helpers != "function mine() {}" {
+		t.Errorf("helpers = %q, want the author's text only", template.Helpers)
+	}
+}
+
+func TestRenderInlineOfADraftPutsTheFixedHelpersInFront(t *testing.T) {
+	client, rec := newRecordingJSReport(t, map[string]reply{"POST /api/report": {http.StatusOK, `PNG`}})
+
+	_, _, err := client.RenderInline(lib.PreviewRender{TemplateSource: lib.TemplateSource{Recipe: "chrome-pdf", Content: "<p/>", Helpers: "function mine() {}"}}, nil, "Bearer caller")
+	if err != nil {
+		t.Fatal(err)
+	}
+	template, _ := rec.find(http.MethodPost, "/api/report").Body["template"].(map[string]any)
+	if template["helpers"] != lib.FixedTemplateHelpers+"\nfunction mine() {}" {
+		t.Errorf("helpers = %q, want the draft to render with the helpers a saved template gets", template["helpers"])
 	}
 }
 
@@ -649,4 +687,9 @@ func TestWriteUnauthorizedIsReportedAsSuch(t *testing.T) {
 	if !errors.Is(err, lib.ErrUnauthorized) {
 		t.Fatalf("err = %v, want unauthorized", err)
 	}
+}
+
+func jsonQuote(text string) string {
+	raw, _ := json.Marshal(text)
+	return string(raw)
 }

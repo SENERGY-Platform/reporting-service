@@ -35,7 +35,9 @@ behind it in [report job design](report-job-design.md).
 ## GET /templates/:id
 
 The template carries both the raw JSON string it was defined with and a
-structured description derived from it.
+structured description derived from it. A template written through `/templates`
+also carries `helpers`, the author's text without the fixed helpers (see
+[Writing templates](#writing-templates)).
 
 ```json
 {
@@ -296,11 +298,17 @@ What the template receives as `consumption`, here for a run on 2026-11-23:
   "period": { "kind": "previousMonth", "start": "2026-10-01", "end": "2026-10-31", "timeZone": "Europe/Berlin" },
   "carriers": ["electricity", "gas"],
   "rows": [
-    { "nodeId": "n-site", "name": "Werk", "path": ["Werk"], "depth": 0, "values": { "electricity": 500.5, "gas": 60 }, "share": null, "alsoUnder": [] },
+    { "nodeId": "n-site", "name": "Werk", "path": ["Werk"], "depth": 0, "values": { "electricity": 500.5, "gas": 60 }, "share": null, "alsoUnder": [], "generation": { "electricity": 11047 } },
     { "nodeId": "n-gas", "name": "Gaszaehler", "path": ["Werk", "Gaszaehler"], "depth": 1, "values": { "gas": 60 }, "share": 100, "alsoUnder": ["Halle"] }
   ],
   "meters": [
     { "nodeId": "n-gas", "deviceId": "dev-gas", "name": "Gaszaehler", "status": "partial", "first": "2026-10-12", "last": "2026-10-31" }
+  ],
+  "notMeters": [
+    { "nodeId": "n-battery", "deviceId": "dev-battery", "name": "Speicher", "deviceType": "Batteriespeicher" }
+  ],
+  "generation": [
+    { "nodeId": "n-chp", "deviceId": "dev-chp", "name": "BHKW", "carrier": "electricity", "kwh": 11047 }
   ],
   "generatedAt": "2026-11-23T15:30:00+01:00"
 }
@@ -313,11 +321,22 @@ What the template receives as `consumption`, here for a run on 2026-11-23:
   it twice. A detached node (edge weight 0) is a top row of its own, and a node
   marked `dashboard/excluded` has neither a row nor a meter. `values` are kWh,
   water in m³. A carrier a node never measured is absent.
+- `generation` of a row is what the plants at and below the node made, kWh per
+  carrier, not weighted by shares, and absent where there are none. Consumption in
+  `values` is not reduced by it. The top level `generation` has one entry per plant
+  and carrier (`kwh`). A plant is a device with a feed-in register and no draw register
+  for the carrier. A grid meter with both registers is none, its feed-in is not
+  listed. Water is never generation. `carriers` narrows it like the values.
 - `meters` has one entry per device node. `status` is `none` without readings,
   `partial` if the first reading is more than a day after the start or the last more
   than a day before the end, else `complete`. First and last are taken over all
   registers of the meter, one that lacks an end does not hide the others. `first`
   and `last` are days and absent where no register has that end.
+- `notMeters` lists device nodes that have no reading and whose device type name
+  (from the device repository) has no "meter" or "zähler" in it, such as a storage or
+  a CHP unit without a register. They are not in `meters`, since they are no gap. A
+  device whose type is unknown, also where the repository does not answer, stays a
+  meter.
 - A refusal of the graph by the device repository or figures (for example 403 on a
   graph the report owner may not read) fails the run with a message naming the
   service, the status and the start of the answer. Devices the owner may not read are
@@ -352,9 +371,34 @@ Limits:
 |---|---|
 | `name` | 100 characters, not empty, no `<>:"/\|?*` or control characters, no space at either end |
 | `content` | not empty, 512 KiB |
-| `helpers` | optional, the JavaScript of the handlebars helpers, 64 KiB |
+| `helpers` | optional, the JavaScript of the handlebars helpers, 64 KiB, without a function named like a fixed helper |
 | `sampleData` | a JSON object, 256 KiB |
 | request body | 2 MiB |
+
+### Fixed helpers
+
+Every template written through `POST` or `PUT /templates` gets the helpers below in
+front of its own, in the `helpers` field of the jsreport template (the constant
+`FixedTemplateHelpers` in `lib/template_helpers.go`). `GET /templates/:id` and the
+answers of `POST` and `PUT` return only the author's text, and a write puts the set
+in front again, never twice. A preview of a draft renders with them too. Templates
+that report-sync keeps are not touched.
+
+| Helper | Output | Example |
+|---|---|---|
+| `{{number value decimals}}` | German format with thousands dots, 0 decimals by default, empty for a missing or non-numeric value | `{{number 1234567.891 2}}` gives `1.234.567,89`, `{{number 0.5}}` gives `1` |
+| `{{date day}}` | `YYYY-MM-DD` as `DD.MM.YYYY`, empty otherwise | `2026-10-31` gives `31.10.2026` |
+| `{{dateTime instant}}` | RFC 3339 instant as `DD.MM.YYYY HH:MM` in Europe/Berlin | `2026-07-01T10:05:00Z` gives `01.07.2026 12:05` |
+| `{{carrier key}}` | `electricity` Strom, `gas` Gas, `biogas` Biogas, `oil` Heizöl, `heat` Wärme, `water` Wasser, another key as it is | `water` gives `Wasser` |
+| `{{unit key}}` | `m³` for `water`, else `kWh` | `gas` gives `kWh` |
+| `{{status key}}` | `none` ohne Daten, `partial` Teilzeitraum, `complete` vollständig | `partial` gives `Teilzeitraum` |
+| `{{indent depth}}` | three figure spaces (U+2007) per level, since a cell drops leading spaces | `{{indent depth}}{{name}}` |
+
+Only function declarations become helpers in jsreport, so the author's helpers can
+call the fixed ones, as in `function share(v) { return number(v, 1) + ' %' }`. A
+helper that declares a function with the name of a fixed one (`number`, `date`,
+`dateTime`, `carrier`, `unit`, `status`, `indent`) is refused with `400`, also in a
+preview. The check is textual, so the name in a comment or a string is refused too.
 
 `PUT /templates/:id` takes the same body and answers `200`, `DELETE /templates/:id`
 removes template and sample data and answers `204`. Both only work on a template

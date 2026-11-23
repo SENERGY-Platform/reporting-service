@@ -137,9 +137,14 @@ func templateBody(input lib.TemplateInput) map[string]interface{} {
 		"engine":  templateEngine,
 		"recipe":  input.Recipe,
 		"content": input.Content,
-		"helpers": input.Helpers,
+		"helpers": lib.ComposeTemplateHelpers(input.Helpers),
 	}
 	return body
+}
+
+// templateHelpersOf is the helpers text as it is stored, the fixed block included.
+func templateHelpersOf(input lib.TemplateInput) string {
+	return lib.ComposeTemplateHelpers(input.Helpers)
 }
 
 func sampleDataJSON(input lib.TemplateInput) (string, error) {
@@ -177,6 +182,7 @@ func (j *Client) CreateTemplate(folderShortId string, input lib.TemplateInput, a
 	if err = json.Unmarshal(raw, &created); err != nil {
 		return
 	}
+	created.Helpers = templateHelpersOf(input)
 	return buildTemplate(created, createdData, dataJSON)
 }
 
@@ -227,6 +233,7 @@ func (j *Client) UpdateTemplate(folderShortId string, id string, input lib.Templ
 	}
 	stored.Name = input.Name
 	stored.Recipe = input.Recipe
+	stored.Helpers = templateHelpersOf(input)
 	return buildTemplate(stored, data, dataJSON)
 }
 
@@ -274,7 +281,7 @@ func (j *Client) RenderInline(render lib.PreviewRender, data map[string]interfac
 		template["content"] = render.Content
 		template["engine"] = templateEngine
 		template["recipe"] = render.Recipe
-		template["helpers"] = render.Helpers
+		template["helpers"] = lib.ComposeTemplateHelpers(render.Helpers)
 	}
 	if render.Image {
 		template["recipe"] = "chrome-image"
@@ -398,6 +405,7 @@ func buildTemplate(template Template, data Data, dataJSON string) (result lib.Te
 	result.Id = template.Id
 	result.Name = template.Name
 	result.Type = TypeMap[template.Recipe]
+	result.Helpers = lib.AuthorTemplateHelpers(template.Helpers)
 	result.Data.Id = data.Id
 	result.Data.Name = data.Name
 	result.Data.DataJSONString = dataJSON

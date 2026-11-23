@@ -118,6 +118,7 @@ func (j *Client) GetTemplateById(templateId string, authString string) (template
 	template.Id = resp.Id
 	template.Name = resp.Name
 	template.Type = TypeMap[resp.Recipe]
+	template.Helpers = lib.AuthorTemplateHelpers(resp.Helpers)
 
 	template.Data.Id = jsData.Id
 	template.Data.Name = jsData.Name

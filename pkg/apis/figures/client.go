@@ -81,6 +81,8 @@ type TotalsResponse struct {
 	Range            Range                          `json:"range"`
 	ReadingsByDevice map[string][]MeterReading      `json:"readingsByDevice"`
 	Totals           map[string]map[string]*float64 `json:"totals"`
+	// GenerationByDevice is the feed-in registers per device in kWh.
+	GenerationByDevice map[string]map[string]float64 `json:"generationByDevice"`
 }
 
 // Totals totals the consumption per node of a graph with the caller's token.

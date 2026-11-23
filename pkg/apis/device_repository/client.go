@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -91,4 +92,41 @@ func (c *Client) GetGraph(authTokenString string, id string) (graph Graph, err e
 		return graph, fmt.Errorf("device_repository.client - response unmarshal error: %w", err)
 	}
 	return
+}
+
+const deviceTypeChunk = 50
+
+// GetDeviceTypeNames reads the device type name of each device it can read, keyed by
+// device id. A device the token may not read, or whose type has no name, is absent.
+func (c *Client) GetDeviceTypeNames(authTokenString string, deviceIds []string) (map[string]string, error) {
+	names := map[string]string{}
+	for start := 0; start < len(deviceIds); start += deviceTypeChunk {
+		chunk := deviceIds[start:min(start+deviceTypeChunk, len(deviceIds))]
+		escaped := make([]string, len(chunk))
+		for i, id := range chunk {
+			escaped[i] = url.QueryEscape(id)
+		}
+		response, err := c.HttpClient.R().
+			SetHeader("Authorization", authTokenString).
+			Get(c.BaseUrl + "/device-repository/extended-devices?fulldt=false&ids=" + strings.Join(escaped, ","))
+		if err != nil {
+			return nil, err
+		}
+		if response.StatusCode() != http.StatusOK {
+			return nil, &StatusError{Status: response.StatusCode(), Body: response.String()}
+		}
+		var devices []struct {
+			Id             string `json:"id"`
+			DeviceTypeName string `json:"device_type_name"`
+		}
+		if err = json.Unmarshal(response.Body(), &devices); err != nil {
+			return nil, fmt.Errorf("device_repository.client - response unmarshal error: %w", err)
+		}
+		for _, device := range devices {
+			if device.Id != "" && device.DeviceTypeName != "" {
+				names[device.Id] = device.DeviceTypeName
+			}
+		}
+	}
+	return names, nil
 }

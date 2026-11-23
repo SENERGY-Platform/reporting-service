@@ -220,6 +220,7 @@ func TestPostTemplateRefusesInvalidInput(t *testing.T) {
 		"empty content":      `{"name":"n","recipe":"chrome-pdf","content":"","sampleData":{}}`,
 		"content too large":  fmt.Sprintf(`{"name":"n","recipe":"chrome-pdf","content":%q,"sampleData":{}}`, strings.Repeat("x", maxTemplateContent+1)),
 		"helpers too large":  fmt.Sprintf(`{"name":"n","recipe":"chrome-pdf","content":"x","helpers":%q,"sampleData":{}}`, strings.Repeat("x", maxTemplateHelpers+1)),
+		"helper override":    `{"name":"n","recipe":"chrome-pdf","content":"x","helpers":"function number(v) { return v }","sampleData":{}}`,
 		"sample data large":  fmt.Sprintf(`{"name":"n","recipe":"chrome-pdf","content":"x","sampleData":{"a":%q}}`, strings.Repeat("x", maxSampleData+1)),
 		"sample data array":  `{"name":"n","recipe":"chrome-pdf","content":"x","sampleData":[1]}`,
 		"sample data string": `{"name":"n","recipe":"chrome-pdf","content":"x","sampleData":"{}"}`,
@@ -345,11 +346,12 @@ func TestPreviewOfAStoredTemplateLoadsItsSource(t *testing.T) {
 
 func TestPreviewRefusesInvalidInput(t *testing.T) {
 	cases := map[string]struct{ path, body string }{
-		"neither":       {"/templates/preview", `{"data":{}}`},
-		"both":          {"/templates/preview", `{"templateId":"t1","template":{"recipe":"chrome-pdf","content":"x"}}`},
-		"bad recipe":    {"/templates/preview", `{"template":{"recipe":"html","content":"x"}}`},
-		"empty content": {"/templates/preview", `{"template":{"recipe":"chrome-pdf","content":""}}`},
-		"unknown as":    {"/templates/preview?as=pdf", `{"templateId":"t1"}`},
+		"neither":         {"/templates/preview", `{"data":{}}`},
+		"both":            {"/templates/preview", `{"templateId":"t1","template":{"recipe":"chrome-pdf","content":"x"}}`},
+		"bad recipe":      {"/templates/preview", `{"template":{"recipe":"html","content":"x"}}`},
+		"empty content":   {"/templates/preview", `{"template":{"recipe":"chrome-pdf","content":""}}`},
+		"unknown as":      {"/templates/preview?as=pdf", `{"templateId":"t1"}`},
+		"helper override": {"/templates/preview", `{"template":{"recipe":"chrome-pdf","content":"x","helpers":"function date(v) {}"}}`},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

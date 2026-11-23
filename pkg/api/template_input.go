@@ -80,7 +80,7 @@ func validateContent(content string, helpers string) error {
 	if len(helpers) > maxTemplateHelpers {
 		return fmt.Errorf("helpers are larger than %d bytes", maxTemplateHelpers)
 	}
-	return nil
+	return lib.CheckAuthorHelpers(helpers)
 }
 
 func validateTemplateName(name string) error {

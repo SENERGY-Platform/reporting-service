@@ -269,7 +269,7 @@ func TestBuildFiguresResultMapsTheRecordedAnswerToTheDocumentedForm(t *testing.T
 	query := lib.FiguresQuery{GraphId: "graph-1"}
 	now := berlinTime(t, "2026-11-23 15:30")
 
-	got, err := buildFiguresResult(graph, totals, query, nil, octoberWindow(t), now)
+	got, err := buildFiguresResult(graph, totals, query, nil, octoberWindow(t), now, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -295,6 +295,8 @@ func TestBuildFiguresResultMapsTheRecordedAnswerToTheDocumentedForm(t *testing.T
 	    {"nodeId": "n-power", "deviceId": "dev-power", "name": "Strom Halle", "status": "complete", "first": "2026-10-01", "last": "2026-10-31"},
 	    {"nodeId": "n-grid", "deviceId": "dev-grid", "name": "Netzanschluss", "status": "complete", "first": "2026-10-01", "last": "2026-10-31"}
 	  ],
+	  "notMeters": [],
+	  "generation": [],
 	  "generatedAt": "2026-11-23T15:30:00+01:00"
 	}`
 	var wantValue any
@@ -309,7 +311,7 @@ func TestBuildFiguresResultMapsTheRecordedAnswerToTheDocumentedForm(t *testing.T
 
 func TestBuildFiguresResultKeepsAnUnmeasuredCarrierOutOfValues(t *testing.T) {
 	graph, totals := recordedFigures(t)
-	got, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-1"}, nil, octoberWindow(t), time.Now())
+	got, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-1"}, nil, octoberWindow(t), time.Now(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -325,7 +327,7 @@ func TestBuildFiguresResultKeepsAnUnmeasuredCarrierOutOfValues(t *testing.T) {
 
 func TestBuildFiguresResultCutsToTheRequestedCarriers(t *testing.T) {
 	graph, totals := recordedFigures(t)
-	got, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-1"}, []string{"gas", "water"}, octoberWindow(t), time.Now())
+	got, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-1"}, []string{"gas", "water"}, octoberWindow(t), time.Now(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -344,7 +346,7 @@ func TestBuildFiguresResultCutsToTheRequestedCarriers(t *testing.T) {
 func TestBuildFiguresResultNarrowsTheRowsToTheNodeAndWhatIsBelow(t *testing.T) {
 	graph, totals := recordedFigures(t)
 	query := lib.FiguresQuery{GraphId: "graph-1", NodeId: strPtr("n-hall")}
-	got, err := buildFiguresResult(graph, totals, query, nil, octoberWindow(t), time.Now())
+	got, err := buildFiguresResult(graph, totals, query, nil, octoberWindow(t), time.Now(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -369,7 +371,7 @@ func TestBuildFiguresResultNarrowsTheRowsToTheNodeAndWhatIsBelow(t *testing.T) {
 
 func TestBuildFiguresResultRejectsANodeOutsideTheGraph(t *testing.T) {
 	graph, totals := recordedFigures(t)
-	_, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-1", NodeId: strPtr("nope")}, nil, octoberWindow(t), time.Now())
+	_, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-1", NodeId: strPtr("nope")}, nil, octoberWindow(t), time.Now(), nil)
 	if err == nil || !strings.Contains(err.Error(), "nope") {
 		t.Errorf("error = %v, want one naming the node", err)
 	}
@@ -378,7 +380,7 @@ func TestBuildFiguresResultRejectsANodeOutsideTheGraph(t *testing.T) {
 func TestBuildFiguresResultListsANodeWithTwoParentsOnce(t *testing.T) {
 	graph, totals := recordedFigures(t)
 	graph.Edges = append(graph.Edges, device_repository.GraphEdge{FromNodeId: "n-power", ToNodeId: "n-site", Weight: floatPtr(50)})
-	got, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-1"}, nil, octoberWindow(t), time.Now())
+	got, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-1"}, nil, octoberWindow(t), time.Now(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -396,7 +398,7 @@ func TestBuildFiguresResultListsANodeWithTwoParentsOnce(t *testing.T) {
 func TestBuildFiguresResultNamesTheGraphByItsAttributeFirst(t *testing.T) {
 	graph, totals := recordedFigures(t)
 	graph.Attributes = []device_repository.Attribute{{Key: "name", Value: "Standort Nord"}}
-	got, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-1"}, nil, octoberWindow(t), time.Now())
+	got, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-1"}, nil, octoberWindow(t), time.Now(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -650,7 +652,7 @@ func TestBuildFiguresResultGivesTheShareAndTheOtherParents(t *testing.T) {
 		device_repository.GraphEdge{FromNodeId: "n-power", ToNodeId: "n-grid", Weight: floatPtr(50)},
 		device_repository.GraphEdge{FromNodeId: "n-power", ToNodeId: "n-site", Weight: floatPtr(50)},
 	)
-	got, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-1"}, nil, octoberWindow(t), time.Now())
+	got, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-1"}, nil, octoberWindow(t), time.Now(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -678,7 +680,7 @@ func TestBuildFiguresResultSplitsANodeBetweenTwoParentsAtFiftyEach(t *testing.T)
 		}
 	}
 	graph.Edges = append(graph.Edges, device_repository.GraphEdge{FromNodeId: "n-power", ToNodeId: "n-grid", Weight: floatPtr(50)})
-	got, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-1"}, nil, octoberWindow(t), time.Now())
+	got, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-1"}, nil, octoberWindow(t), time.Now(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -694,7 +696,7 @@ func TestBuildFiguresResultSplitsANodeBetweenTwoParentsAtFiftyEach(t *testing.T)
 
 func TestBuildFiguresResultLeavesExcludedNodesOut(t *testing.T) {
 	graph, totals := recordedFigures(t)
-	got, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-1"}, nil, octoberWindow(t), time.Now())
+	got, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-1"}, nil, octoberWindow(t), time.Now(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -715,7 +717,7 @@ func TestBuildFiguresResultNamesTheGraphFromANodeWithoutAnyEdgeAbove(t *testing.
 	// makes it a child, so the name comes from the site and not from "Abgekoppelt".
 	graph, totals := recordedFigures(t)
 	graph.Nodes = append([]device_repository.GraphNode{graph.Nodes[7]}, graph.Nodes[:7]...)
-	got, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-1"}, nil, octoberWindow(t), time.Now())
+	got, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-1"}, nil, octoberWindow(t), time.Now(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -828,5 +830,162 @@ func TestFiguresTimeoutMustBePositiveAndFallsBackToTheDefault(t *testing.T) {
 		if got := FiguresTimeout(cfg); got != 2*time.Minute {
 			t.Errorf("timeout %q falls back to %v, want 2m", value, got)
 		}
+	}
+}
+
+const plantsGraph = `{
+  "id": "graph-2",
+  "nodes": [
+    {"id": "n-site", "attributes": [{"key": "name", "value": "Werk"}]},
+    {"id": "n-hall", "attributes": [{"key": "name", "value": "Halle"}]},
+    {"id": "n-grid", "resource_type": "device", "resource_id": "dev-grid", "attributes": [{"key": "name", "value": "Netzanschluss"}]},
+    {"id": "n-chp", "resource_type": "device", "resource_id": "dev-chp", "attributes": [{"key": "name", "value": "BHKW"}]},
+    {"id": "n-pv", "resource_type": "device", "resource_id": "dev-pv", "attributes": [{"key": "name", "value": "Wechselrichter"}]},
+    {"id": "n-battery", "resource_type": "device", "resource_id": "dev-battery", "attributes": [{"key": "name", "value": "Speicher"}]},
+    {"id": "n-silent", "resource_type": "device", "resource_id": "dev-silent", "attributes": [{"key": "name", "value": "Unterzaehler"}]},
+    {"id": "n-unknown", "resource_type": "device", "resource_id": "dev-unknown", "attributes": [{"key": "name", "value": "Ohne Typ"}]}
+  ],
+  "edges": [
+    {"from_node_id": "n-hall", "to_node_id": "n-site", "weight": 100},
+    {"from_node_id": "n-grid", "to_node_id": "n-site", "weight": 100},
+    {"from_node_id": "n-chp", "to_node_id": "n-hall", "weight": 100},
+    {"from_node_id": "n-pv", "to_node_id": "n-hall", "weight": 100},
+    {"from_node_id": "n-battery", "to_node_id": "n-hall", "weight": 100},
+    {"from_node_id": "n-silent", "to_node_id": "n-hall", "weight": 100},
+    {"from_node_id": "n-unknown", "to_node_id": "n-hall", "weight": 100}
+  ]
+}`
+
+const plantsTotals = `{
+  "readingsByDevice": {
+    "dev-grid": [
+      {"carrier": "electricity", "direction": "draw", "first": {"at": "2026-10-01T00:00:10+02:00", "value": 10}, "last": {"at": "2026-10-31T23:59:50+01:00", "value": 510}},
+      {"carrier": "electricity", "direction": "feedIn", "first": {"at": "2026-10-01T00:00:10+02:00", "value": 1}, "last": {"at": "2026-10-31T23:59:50+01:00", "value": 5}}
+    ],
+    "dev-chp": [{"carrier": "electricity", "direction": "feedIn", "first": {"at": "2026-10-01T00:00:10+02:00", "value": 0}, "last": {"at": "2026-10-31T23:59:50+01:00", "value": 11047}}],
+    "dev-pv": [{"carrier": "electricity", "direction": "feedIn", "first": {"at": "2026-10-01T00:00:10+02:00", "value": 0}, "last": {"at": "2026-10-31T23:59:50+01:00", "value": 800.5}}]
+  },
+  "totals": {"n-site": {"electricity": 500}, "n-hall": {"electricity": 0}},
+  "generationByDevice": {
+    "dev-grid": {"electricity": 4},
+    "dev-chp": {"electricity": 11047},
+    "dev-pv": {"electricity": 800.5, "water": 3}
+  }
+}`
+
+func plantsFigures(t *testing.T) (device_repository.Graph, figures.TotalsResponse) {
+	t.Helper()
+	var graph device_repository.Graph
+	var totals figures.TotalsResponse
+	if err := json.Unmarshal([]byte(plantsGraph), &graph); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(plantsTotals), &totals); err != nil {
+		t.Fatal(err)
+	}
+	return graph, totals
+}
+
+func TestBuildFiguresResultListsPlantsAndLeavesGridMetersOut(t *testing.T) {
+	graph, totals := plantsFigures(t)
+	got, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-2"}, nil, octoberWindow(t), time.Now(), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []lib.FiguresPlant{
+		{NodeId: "n-chp", DeviceId: "dev-chp", Name: "BHKW", Carrier: "electricity", Kwh: 11047},
+		{NodeId: "n-pv", DeviceId: "dev-pv", Name: "Wechselrichter", Carrier: "electricity", Kwh: 800.5},
+	}
+	if !reflect.DeepEqual(got.Generation, want) {
+		t.Errorf("generation = %+v, want %+v (the grid meter draws, so its feed-in is no plant, water is no generation)", got.Generation, want)
+	}
+	rows := map[string]lib.FiguresRow{}
+	for _, row := range got.Rows {
+		rows[row.NodeId] = row
+	}
+	for _, id := range []string{"n-site", "n-hall"} {
+		if !reflect.DeepEqual(rows[id].Generation, map[string]float64{"electricity": 11847.5}) {
+			t.Errorf("%s generation = %v, want the plants beneath it", id, rows[id].Generation)
+		}
+	}
+	if !reflect.DeepEqual(rows["n-chp"].Generation, map[string]float64{"electricity": 11047}) {
+		t.Errorf("n-chp generation = %v, want its own output", rows["n-chp"].Generation)
+	}
+	for _, id := range []string{"n-grid", "n-battery", "n-silent"} {
+		if rows[id].Generation != nil {
+			t.Errorf("%s has generation %v, want none", id, rows[id].Generation)
+		}
+	}
+	raw, _ := json.Marshal(rows["n-grid"])
+	if strings.Contains(string(raw), "generation") {
+		t.Errorf("a row without plants carries the field: %s", raw)
+	}
+	// the consumption side stays as it was
+	if rows["n-site"].Values["electricity"] == nil || *rows["n-site"].Values["electricity"] != 500 {
+		t.Errorf("site values = %v, want 500 kWh electricity", rows["n-site"].Values)
+	}
+}
+
+func TestBuildFiguresResultCutsGenerationToTheRequestedCarriers(t *testing.T) {
+	graph, totals := plantsFigures(t)
+	got, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-2"}, []string{"gas"}, octoberWindow(t), time.Now(), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got.Generation) != 0 {
+		t.Errorf("generation = %+v, want none for gas", got.Generation)
+	}
+}
+
+func TestBuildFiguresResultSeparatesDevicesThatAreNoMeters(t *testing.T) {
+	graph, totals := plantsFigures(t)
+	types := map[string]string{
+		"dev-grid": "Stromzähler", "dev-battery": "Batteriespeicher", "dev-silent": "Smart-METER Strom",
+		"dev-chp": "BHKW", "dev-pv": "PV-Wechselrichter",
+	}
+	got, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-2"}, nil, octoberWindow(t), time.Now(), types)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	wantNot := []lib.FiguresNotMeter{{NodeId: "n-battery", DeviceId: "dev-battery", Name: "Speicher", DeviceType: "Batteriespeicher"}}
+	if !reflect.DeepEqual(got.NotMeters, wantNot) {
+		t.Errorf("notMeters = %+v, want %+v", got.NotMeters, wantNot)
+	}
+	status := map[string]string{}
+	for _, meter := range got.Meters {
+		status[meter.NodeId] = meter.Status
+	}
+	// a plant with readings stays a meter, a silent meter and a device of unknown type are gaps
+	want := map[string]string{"n-grid": "complete", "n-chp": "complete", "n-pv": "complete", "n-silent": "none", "n-unknown": "none"}
+	if !reflect.DeepEqual(status, want) {
+		t.Errorf("meters = %v, want %v", status, want)
+	}
+}
+
+func TestDeviceTypesAsksForDevicesWithoutReadingsOnly(t *testing.T) {
+	graph, totals := plantsFigures(t)
+	var asked []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked = append(asked, r.URL.Path+"?"+r.URL.RawQuery)
+		_, _ = w.Write([]byte(`[{"id":"dev-battery","device_type_name":"Batteriespeicher"},{"id":"dev-silent"}]`))
+	}))
+	t.Cleanup(srv.Close)
+	client := &Client{DeviceRepository: &device_repository.Client{BaseUrl: srv.URL, HttpClient: resty.New()}}
+	types := client.deviceTypes("Bearer x", graph, totals)
+	if !reflect.DeepEqual(types, map[string]string{"dev-battery": "Batteriespeicher"}) {
+		t.Errorf("types = %v", types)
+	}
+	if len(asked) != 1 || asked[0] != "/device-repository/extended-devices?fulldt=false&ids=dev-battery,dev-silent,dev-unknown" {
+		t.Errorf("asked %v, want one call for the three devices without readings", asked)
+	}
+}
+
+func TestDeviceTypesFallBackToUnknownWhenTheRepositoryRefuses(t *testing.T) {
+	graph, totals := plantsFigures(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusForbidden) }))
+	t.Cleanup(srv.Close)
+	client := &Client{DeviceRepository: &device_repository.Client{BaseUrl: srv.URL, HttpClient: resty.New()}}
+	if types := client.deviceTypes("Bearer x", graph, totals); types != nil {
+		t.Errorf("types = %v, want none so that every device counts as a meter", types)
 	}
 }

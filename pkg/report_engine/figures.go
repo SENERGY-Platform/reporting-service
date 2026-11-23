@@ -237,7 +237,32 @@ func (r *Client) figuresData(authToken string, query lib.FiguresQuery) (lib.Figu
 	if err != nil {
 		return lib.FiguresResult{}, loggedPlatformError("reading the consumption from figures", query.GraphId, err)
 	}
-	return buildFiguresResult(graph, totals, query, carriers, window, now)
+	return buildFiguresResult(graph, totals, query, carriers, window, now, r.deviceTypes(authToken, graph, totals))
+}
+
+// deviceTypes reads the type names of the device nodes that have no reading, the
+// only ones that can turn out not to be meters. Where the repository does not
+// answer, the types stay unknown and those devices count as meters.
+func (r *Client) deviceTypes(authToken string, graph device_repository.Graph, totals figures.TotalsResponse) map[string]string {
+	var ids []string
+	seen := map[string]bool{}
+	for _, node := range graph.Nodes {
+		id := node.ResourceId
+		if node.ResourceType != "device" || id == "" || seen[id] || excluded(node) || len(totals.ReadingsByDevice[id]) > 0 {
+			continue
+		}
+		seen[id] = true
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	types, err := r.DeviceRepository.GetDeviceTypeNames(authToken, ids)
+	if err != nil {
+		util.Logger.Warn("reading device types failed, devices without readings count as meters", "error", platformError("reading the device types", "", err).Error())
+		return nil
+	}
+	return types
 }
 
 func loggedPlatformError(doing string, graphId string, err error) error {
@@ -373,7 +398,9 @@ func clampedShare(weight *float64) *float64 {
 // A node with several parents appears once, under the first parent reached, so sums
 // over rows do not count it twice, and names the others in AlsoUnder. A node marked
 // as excluded gets no row and no meter, the nodes below it are still listed.
-func buildFiguresResult(graph device_repository.Graph, totals figures.TotalsResponse, query lib.FiguresQuery, carriers []string, window periodWindow, now time.Time) (lib.FiguresResult, error) {
+// A device without a reading whose type is known and no meter is a not-meter, and
+// the plants among the devices are listed with what they made.
+func buildFiguresResult(graph device_repository.Graph, totals figures.TotalsResponse, query lib.FiguresQuery, carriers []string, window periodWindow, now time.Time, deviceTypes map[string]string) (lib.FiguresResult, error) {
 	byId := make(map[string]device_repository.GraphNode, len(graph.Nodes))
 	for _, node := range graph.Nodes {
 		byId[node.Id] = node
@@ -409,6 +436,8 @@ func buildFiguresResult(graph device_repository.Graph, totals figures.TotalsResp
 		Period:      window.resolved(),
 		Rows:        []lib.FiguresRow{},
 		Meters:      []lib.FiguresMeter{},
+		NotMeters:   []lib.FiguresNotMeter{},
+		Generation:  []lib.FiguresPlant{},
 		GeneratedAt: now.In(window.location).Format(time.RFC3339),
 	}
 	var roots []string
@@ -429,13 +458,17 @@ func buildFiguresResult(graph device_repository.Graph, totals figures.TotalsResp
 	}
 
 	visited := map[string]bool{}
-	var walk func(id string, under string, path []string)
-	walk = func(id string, under string, path []string) {
+	plantSeen := map[string]bool{}
+	// walk returns what the plants at and below the node made, per carrier.
+	var walk func(id string, under string, path []string) map[string]float64
+	walk = func(id string, under string, path []string) map[string]float64 {
 		if visited[id] {
-			return
+			return nil
 		}
 		visited[id] = true
 		node := byId[id]
+		made := map[string]float64{}
+		rowIndex := -1
 		if !excluded(node) {
 			path = append(path[:len(path):len(path)], nodeName(node))
 			row := lib.FiguresRow{
@@ -459,13 +492,34 @@ func buildFiguresResult(graph device_repository.Graph, totals figures.TotalsResp
 				sort.Strings(row.AlsoUnder)
 			}
 			result.Rows = append(result.Rows, row)
+			rowIndex = len(result.Rows) - 1
 			if node.ResourceType == "device" && node.ResourceId != "" {
-				result.Meters = append(result.Meters, meterCoverage(node, totals.ReadingsByDevice[node.ResourceId], window))
+				meter := meterCoverage(node, totals.ReadingsByDevice[node.ResourceId], window)
+				if typeName := deviceTypes[node.ResourceId]; meter.Status == lib.CoverageNone && typeName != "" && !isMeterType(typeName) {
+					result.NotMeters = append(result.NotMeters, lib.FiguresNotMeter{NodeId: id, DeviceId: node.ResourceId, Name: nodeName(node), DeviceType: typeName})
+				} else {
+					result.Meters = append(result.Meters, meter)
+				}
+				for _, plant := range plantsOf(node, totals, carriers) {
+					key := plant.DeviceId + "/" + plant.Carrier
+					if plantSeen[key] {
+						continue
+					}
+					plantSeen[key] = true
+					result.Generation = append(result.Generation, plant)
+					made[plant.Carrier] += plant.Kwh
+				}
 			}
 		}
 		for _, child := range children[id] {
-			walk(child, id, path)
+			for carrier, kwh := range walk(child, id, path) {
+				made[carrier] += kwh
+			}
 		}
+		if rowIndex >= 0 && len(made) > 0 {
+			result.Rows[rowIndex].Generation = made
+		}
+		return made
 	}
 	for _, root := range roots {
 		walk(root, "", nil)
@@ -546,4 +600,34 @@ func meterCoverage(node device_repository.GraphNode, readings []figures.MeterRea
 		meter.Last = last.In(window.location).Format(dayLayout)
 	}
 	return meter
+}
+
+// isMeterType is the approximation dashboard-mcp uses: a device type whose name has
+// no "meter" or "zähler" in it (storage, CHP unit, inverter) is not a meter.
+func isMeterType(typeName string) bool {
+	name := strings.ToLower(typeName)
+	return strings.Contains(name, "meter") || strings.Contains(name, "zähler") || strings.Contains(name, "zaehler")
+}
+
+// plantsOf lists what a device made per energy carrier. A device with a feed-in
+// register and no draw register for the carrier is a plant, one with both is a grid
+// meter whose feed-in is no generation.
+func plantsOf(node device_repository.GraphNode, totals figures.TotalsResponse, carriers []string) []lib.FiguresPlant {
+	var plants []lib.FiguresPlant
+	for _, carrier := range carrierOrder {
+		made := totals.GenerationByDevice[node.ResourceId][carrier]
+		if carrier == "water" || made <= 0 || math.IsInf(made, 0) || math.IsNaN(made) || (carriers != nil && !contains(carriers, carrier)) {
+			continue
+		}
+		drawn := false
+		for _, reading := range totals.ReadingsByDevice[node.ResourceId] {
+			if reading.Carrier == carrier && (reading.Direction == "" || reading.Direction == "draw") {
+				drawn = true
+			}
+		}
+		if !drawn {
+			plants = append(plants, lib.FiguresPlant{NodeId: node.Id, DeviceId: node.ResourceId, Name: nodeName(node), Carrier: carrier, Kwh: made})
+		}
+	}
+	return plants
 }

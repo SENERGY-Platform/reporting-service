@@ -69,6 +69,11 @@ type FiguresResult struct {
 	Carriers []string       `json:"carriers"`
 	Rows     []FiguresRow   `json:"rows"`
 	Meters   []FiguresMeter `json:"meters"`
+	// NotMeters are device nodes without a reading whose device type is no meter
+	// (storage, plant without a register), which are no gap in the data.
+	NotMeters []FiguresNotMeter `json:"notMeters"`
+	// Generation is the output of each plant, one entry per device and carrier.
+	Generation []FiguresPlant `json:"generation"`
 	// GeneratedAt is an RFC 3339 instant.
 	GeneratedAt string `json:"generatedAt"`
 }
@@ -100,6 +105,9 @@ type FiguresRow struct {
 	Share *float64 `json:"share"`
 	// AlsoUnder names the other parents the node hangs under, sorted.
 	AlsoUnder []string `json:"alsoUnder"`
+	// Generation is the kWh per carrier that the plants at and below this node made,
+	// not weighted by shares, and absent where there are none.
+	Generation map[string]float64 `json:"generation,omitempty"`
 }
 
 // FiguresMeter is the data coverage of one device node. First and Last are the days
@@ -111,4 +119,24 @@ type FiguresMeter struct {
 	Status   string `json:"status"`
 	First    string `json:"first,omitempty"`
 	Last     string `json:"last,omitempty"`
+}
+
+// FiguresNotMeter is a device node that is not a meter: it has no reading and its
+// device type does not name a meter.
+type FiguresNotMeter struct {
+	NodeId     string `json:"nodeId"`
+	DeviceId   string `json:"deviceId"`
+	Name       string `json:"name"`
+	DeviceType string `json:"deviceType"`
+}
+
+// FiguresPlant is what one plant made over the period. A device with a feed-in
+// register and no draw register for the carrier is a plant, a grid meter with both
+// is not and its feed-in is not listed.
+type FiguresPlant struct {
+	NodeId   string  `json:"nodeId"`
+	DeviceId string  `json:"deviceId"`
+	Name     string  `json:"name"`
+	Carrier  string  `json:"carrier"`
+	Kwh      float64 `json:"kwh"`
 }
