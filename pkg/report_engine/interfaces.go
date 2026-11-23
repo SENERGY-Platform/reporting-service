@@ -50,3 +50,15 @@ type ReportingDriver interface {
 	DeleteCreatedReportFile(reportId string, authString string) (err error)
 	GetTemplatePreview(id string, authString string) (data []byte, headerContentType string, headerFileExtension string, err error)
 }
+
+// TemplateAuthoring is what a driver needs to offer for templates to be written
+// through this service. Every call runs with the token of the caller, so the
+// report engine decides what that caller may touch.
+type TemplateAuthoring interface {
+	FindFolderShortId(name string, authString string) (string, error)
+	CreateTemplate(folderShortId string, input lib.TemplateInput, authString string) (lib.Template, error)
+	UpdateTemplate(folderShortId string, id string, input lib.TemplateInput, authString string) (lib.Template, error)
+	DeleteTemplate(folderShortId string, id string, authString string) error
+	GetTemplateSource(id string, authString string) (lib.TemplateSource, error)
+	RenderInline(render lib.PreviewRender, data map[string]interface{}, authString string) (content []byte, contentType string, err error)
+}

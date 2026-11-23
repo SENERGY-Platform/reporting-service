@@ -25,8 +25,12 @@ type Template struct {
 	Name             string  `json:"name,omitempty"`
 	Id               string  `json:"_id,omitempty"`
 	Recipe           string  `json:"recipe,omitempty"`
+	Engine           string  `json:"engine,omitempty"`
 	ShortId          string  `json:"shortid,omitempty"`
 	Data             ShortId `json:"data,omitempty"`
+	Folder           ShortId `json:"folder,omitempty"`
+	Content          string  `json:"content,omitempty"`
+	Helpers          string  `json:"helpers,omitempty"`
 	CreationDate     string  `json:"creationDate,omitempty"`
 	ModificationDate string  `json:"modificationDate,omitempty"`
 }
@@ -46,9 +50,30 @@ type DataResponse struct {
 }
 
 type Data struct {
-	Name     string `json:"name,omitempty"`
-	Id       string `json:"_id,omitempty"`
-	DataJSON string `json:"dataJson,omitempty"`
+	Name     string  `json:"name,omitempty"`
+	Id       string  `json:"_id,omitempty"`
+	ShortId  string  `json:"shortid,omitempty"`
+	DataJSON string  `json:"dataJson,omitempty"`
+	Folder   ShortId `json:"folder,omitempty"`
+}
+
+type NamedEntityResponse struct {
+	Entities []NamedEntity `json:"value,omitempty"`
+}
+
+type NamedEntity struct {
+	Name string `json:"name,omitempty"`
+	Id   string `json:"_id,omitempty"`
+}
+
+type FolderResponse struct {
+	Folders []Folder `json:"value,omitempty"`
+}
+
+type Folder struct {
+	Name    string  `json:"name,omitempty"`
+	ShortId string  `json:"shortid,omitempty"`
+	Parent  ShortId `json:"folder,omitempty"`
 }
 
 type ShortId struct {

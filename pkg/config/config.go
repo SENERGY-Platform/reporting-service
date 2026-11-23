@@ -43,6 +43,20 @@ type FiguresConfig struct {
 	Timeout string `json:"timeout" env_var:"FIGURES_TIMEOUT"`
 }
 
+// TemplateConfig enables writing templates. Both values have to be set, otherwise
+// the endpoints that create, change, delete and preview templates answer 404.
+type TemplateConfig struct {
+	// Folder is the name of the jsreport folder templates are created in.
+	Folder string `json:"folder" env_var:"TEMPLATE_FOLDER"`
+	// AuthorRole is the realm role a caller needs to write templates.
+	AuthorRole string `json:"author_role" env_var:"TEMPLATE_AUTHOR_ROLE"`
+}
+
+// Enabled reports whether templates may be written at all.
+func (c TemplateConfig) Enabled() bool {
+	return c.Folder != "" && c.AuthorRole != ""
+}
+
 type KeycloakConfig struct {
 	Url          string                 `json:"url" env_var:"KEYCLOAK_URL"`
 	ClientId     string                 `json:"client_id" env_var:"KEYCLOAK_CLIENT_ID"`
@@ -64,6 +78,7 @@ type Config struct {
 	JSReport                JSReportConfig `json:"jsreport"`
 	SNRGY                   SNRGYConfig    `json:"snrgy"`
 	Figures                 FiguresConfig  `json:"figures"`
+	Templates               TemplateConfig `json:"templates"`
 	Keycloak                KeycloakConfig `json:"keycloak"`
 	Mail                    MailConfig     `json:"mail"`
 	SchedulerTickerDuration string         `json:"scheduler_ticker_duration" env_var:"SCHEDULER_TICKER_DURATION"`

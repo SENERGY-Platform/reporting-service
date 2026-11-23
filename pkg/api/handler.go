@@ -37,6 +37,10 @@ func failed(c *gin.Context, message string, err error) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": MessageUnauthorized})
 		return
 	}
+	if errors.Is(err, lib.ErrNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"error": MessageTemplateNotFound})
+		return
+	}
 	_ = c.Error(errors.New(MessageSomethingWrong))
 }
 
@@ -70,6 +74,7 @@ func getTemplates(reportingClient report_engine.Client) (string, string, gin.Han
 // @Param id path string true "Template ID"
 // @Success	200 {object} lib.Template
 // @Failure	401 {string} str
+// @Failure	404 {string} str
 // @Failure	500 {string} str
 // @Router /templates/:id [get]
 func getTemplate(reportingClient report_engine.Client) (string, string, gin.HandlerFunc) {

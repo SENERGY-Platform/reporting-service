@@ -405,6 +405,74 @@
                         }
                     }
                 }
+            },
+            "post": {
+                "description": "Creates a handlebars template in the configured folder, with a data entity holding the sample data, using the caller's token. Needs the realm role from TEMPLATE_AUTHOR_ROLE, 404 while TEMPLATE_FOLDER or the role is not configured.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Template"
+                ],
+                "summary": "Create template",
+                "parameters": [
+                    {
+                        "description": "Template",
+                        "name": "template",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/lib.TemplateInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/lib.Template"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
             }
         },
         "/templates/:id": {
@@ -435,6 +503,208 @@
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "Replaces name, recipe, content, helpers and sample data of a template in the template folder with the caller's token. A template elsewhere is a 403. Nothing is changed unless the name is free and both writes can be made. Needs the realm role from TEMPLATE_AUTHOR_ROLE.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Template"
+                ],
+                "summary": "Update template",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Template ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Template",
+                        "name": "template",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/lib.TemplateInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/lib.Template"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Deletes a template in the template folder and its sample data with the caller's token. A template elsewhere is a 403. Needs the realm role from TEMPLATE_AUTHOR_ROLE.",
+                "tags": [
+                    "Template"
+                ],
+                "summary": "Delete template",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Template ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/templates/preview": {
+            "post": {
+                "description": "Renders a draft or a stored template with report data, which is resolved like in a real run including figuresQuery. Nothing is stored and no job is created. A stored template is rendered by its id, so its engine and settings apply as in a run, and without data its sample data is used. The answer is a PNG of the top of the page in a viewport of 1200 by 1600 pixels, not the whole page, or with as=file the file of the template's own recipe. Needs the realm role from TEMPLATE_AUTHOR_ROLE.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "image/png"
+                ],
+                "tags": [
+                    "Template"
+                ],
+                "summary": "Preview a template draft",
+                "parameters": [
+                    {
+                        "description": "Draft or template id, and the report data",
+                        "name": "preview",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/lib.TemplatePreviewRequest"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "file renders in the recipe of the template instead of as an image",
+                        "name": "as",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
                         "schema": {
                             "type": "string"
                         }
@@ -784,6 +1054,60 @@
                     "type": "string"
                 },
                 "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "lib.TemplateInput": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "helpers": {
+                    "description": "Helpers is the JavaScript of the template's handlebars helpers.",
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "recipe": {
+                    "type": "string"
+                },
+                "sampleData": {
+                    "description": "SampleData is stored as the template's data entity and shown in the editor.",
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "lib.TemplatePreviewDraft": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "helpers": {
+                    "type": "string"
+                },
+                "recipe": {
+                    "type": "string"
+                }
+            }
+        },
+        "lib.TemplatePreviewRequest": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/lib.ReportObject"
+                    }
+                },
+                "template": {
+                    "$ref": "#/definitions/lib.TemplatePreviewDraft"
+                },
+                "templateId": {
                     "type": "string"
                 }
             }

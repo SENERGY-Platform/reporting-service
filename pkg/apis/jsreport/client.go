@@ -107,6 +107,10 @@ func (j *Client) GetTemplateById(templateId string, authString string) (template
 	if err = json.Unmarshal(response.Body(), &resp); err != nil {
 		return
 	}
+	// jsreport answers an id it does not know with an empty list and status 200
+	if resp.Id == "" {
+		return template, fmt.Errorf("%w: template %s", lib.ErrNotFound, templateId)
+	}
 	jsData, err := j.getTemplateDataByShortId(resp.Data.ShortId, authString)
 	if err != nil {
 		return

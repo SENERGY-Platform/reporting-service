@@ -311,3 +311,23 @@ func TestNewFiguresTimeout(t *testing.T) {
 		t.Errorf("figures timeout = %q, want 30s", cfg.Figures.Timeout)
 	}
 }
+
+func TestNewTemplateAuthoringIsOffByDefaultAndReadsTheEnvironment(t *testing.T) {
+	cfg, err := New("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Templates.Enabled() {
+		t.Error("writing templates must be off without configuration")
+	}
+
+	t.Setenv("TEMPLATE_FOLDER", "folder-a")
+	t.Setenv("TEMPLATE_AUTHOR_ROLE", "role-a")
+	cfg, err = New("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Templates.Folder != "folder-a" || cfg.Templates.AuthorRole != "role-a" || !cfg.Templates.Enabled() {
+		t.Errorf("templates = %+v", cfg.Templates)
+	}
+}

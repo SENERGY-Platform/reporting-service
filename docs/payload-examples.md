@@ -324,3 +324,85 @@ What the template receives as `consumption`, here for a run on 2026-11-23:
   left out by figures without a sign in its answer, so their meter shows `none`.
 - Each call to the device repository and figures is bound by `FIGURES_TIMEOUT`,
   default `2m`.
+
+## Writing templates
+
+Needs `TEMPLATE_FOLDER` and `TEMPLATE_AUTHOR_ROLE` (otherwise `404`) and the
+realm role in the caller's token (otherwise `403`). Fields the body does not
+list, such as `engine` or `scripts`, are refused with `400`. Every call to
+jsreport carries the caller's token, so jsreport's permissions decide.
+
+`POST /templates` creates the sample data and the template in the folder and
+links them. The data entity is named `<name> data`. `recipe` is `chrome-pdf` or
+`html-to-xlsx`, the engine is always handlebars. The answer is `201` with the
+template as in `GET /templates/:id`.
+
+```json
+{
+  "name": "Energieverbrauch Monat",
+  "recipe": "html-to-xlsx",
+  "content": "<table>{{#each consumption.rows}}<tr><td>{{name}}</td></tr>{{/each}}</table>",
+  "sampleData": { "consumption": { "rows": [{ "name": "Werk" }] } }
+}
+```
+
+Limits:
+
+| Field | Limit |
+|---|---|
+| `name` | 100 characters, not empty, no `<>:"/\|?*` or control characters, no space at either end |
+| `content` | not empty, 512 KiB |
+| `helpers` | optional, the JavaScript of the handlebars helpers, 64 KiB |
+| `sampleData` | a JSON object, 256 KiB |
+| request body | 2 MiB |
+
+`PUT /templates/:id` takes the same body and answers `200`, `DELETE /templates/:id`
+removes template and sample data and answers `204`. Both only work on a template
+in the template folder, and a sample data entity elsewhere is left alone (an update
+then gives the template a new one). Names are unique per folder across templates and
+data, compared without regard to case, and are checked before anything is written.
+An update writes the template, then the sample data, and writes the template back if
+the second step fails.
+
+Errors, as `{"error": "<sentence>"}`. The 403 sentences are fixed so that a caller can
+tell the reasons apart:
+
+| Status | Sentence | Reason |
+|---|---|---|
+| 400 | the reason, for example `name is longer than 100 characters` | invalid input |
+| 401 | `report engine rejected the authorization` | jsreport did not accept the token |
+| 403 | `the template author role is missing` | the token lacks `TEMPLATE_AUTHOR_ROLE` |
+| 403 | `template folder not readable` | the caller cannot see the folder `TEMPLATE_FOLDER` |
+| 403 | `no write access to the template folder` | creating was refused by jsreport |
+| 403 | `no write access to the template` | changing or deleting was refused by jsreport |
+| 403 | `only templates in the template folder can be changed` | the template lies elsewhere |
+| 403 | `report engine denied access` | a preview was refused by jsreport |
+| 404 | `writing templates is not configured` | `TEMPLATE_FOLDER` or the role is not set |
+| 404 | `template not found` | the id is unknown or the caller may not read it |
+| 409 | `a template or data with this name already exists: ...` | name taken in the folder |
+| 422 | `could not collect the preview data: ...` | a preview's `data` could not be resolved |
+
+`GET /templates/:id` answers `404 template not found` for an id jsreport does not
+return.
+
+`POST /templates/preview` renders without saving and without a job. Give either a
+draft or the id of a stored template, and `data` as in `POST /report`, so a
+`figuresQuery` is resolved as in a run:
+
+```json
+{
+  "template": { "recipe": "chrome-pdf", "content": "<h1>{{consumption.graph.name}}</h1>" },
+  "data": {
+    "consumption": {
+      "name": "consumption",
+      "valueType": "object",
+      "figuresQuery": { "graphId": "urn:infai:ses:graph:xy", "period": { "kind": "previousMonth" } }
+    }
+  }
+}
+```
+
+The answer is a PNG of the top of the page in a viewport of 1200 by 1600 pixels, not
+the whole page. With `?as=file` it is the file of the recipe instead, `.pdf` or
+`.xlsx`. A stored template is rendered by its id, so its engine and settings apply as
+in a run, and without `data` jsreport uses its sample data.
