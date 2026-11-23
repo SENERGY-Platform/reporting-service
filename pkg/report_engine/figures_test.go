@@ -18,6 +18,7 @@ package report_engine
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -444,10 +445,12 @@ func TestMeterCoverage(t *testing.T) {
 }
 
 type figuresStub struct {
-	mu             sync.Mutex
-	graphStatus    int
-	totalsStatus   int
-	totalsBody     string
+	mu           sync.Mutex
+	graphStatus  int
+	totalsStatus int
+	totalsBody   string
+	// totalsError is the body of a refusal, "forbidden" where empty.
+	totalsError    string
 	totalsRequest  map[string]any
 	authorizations []string
 	graphRequests  int
@@ -474,7 +477,11 @@ func (s *figuresStub) client(t *testing.T, now time.Time) *Client {
 			_ = json.Unmarshal(body, &s.totalsRequest)
 			if s.totalsStatus != 0 {
 				w.WriteHeader(s.totalsStatus)
-				_, _ = w.Write([]byte("forbidden"))
+				body := s.totalsError
+				if body == "" {
+					body = "forbidden"
+				}
+				_, _ = w.Write([]byte(body))
 				return
 			}
 			_, _ = w.Write([]byte(s.totalsBody))
@@ -987,5 +994,250 @@ func TestDeviceTypesFallBackToUnknownWhenTheRepositoryRefuses(t *testing.T) {
 	client := &Client{DeviceRepository: &device_repository.Client{BaseUrl: srv.URL, HttpClient: resty.New()}}
 	if types := client.deviceTypes("Bearer x", graph, totals); types != nil {
 		t.Errorf("types = %v, want none so that every device counts as a meter", types)
+	}
+}
+
+// Two weeks of October as figures cuts them: Thursday to Sunday, then a full week.
+const seriesTotals = `{
+  "graphId": "graph-1",
+  "interval": "week",
+  "totals": {"n-site": {"electricity": 30, "gas": 6}},
+  "series": [
+    {"start": "2026-10-01T00:00:00+02:00", "end": "2026-10-05T00:00:00+02:00", "totals": {
+      "n-site": {"electricity": 10, "gas": 2}, "n-hall": {"electricity": 4, "gas": 2}, "n-power": {"electricity": 4}, "n-gas": {"gas": 3}}},
+    {"start": "2026-10-05T00:00:00+02:00", "end": "2026-10-12T00:00:00+02:00", "totals": {
+      "n-site": {"electricity": 20, "gas": 4}, "n-hall": {"electricity": 8}}}
+  ]
+}`
+
+func seriesFixture(t *testing.T) (device_repository.Graph, figures.TotalsResponse, periodWindow) {
+	t.Helper()
+	graph, _ := recordedFigures(t)
+	var totals figures.TotalsResponse
+	if err := json.Unmarshal([]byte(seriesTotals), &totals); err != nil {
+		t.Fatal(err)
+	}
+	start, end := "2026-10-01", "2026-10-11"
+	window, err := resolvePeriod(lib.FiguresPeriod{Kind: "fixed", Start: &start, End: &end}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return graph, totals, window
+}
+
+func stringPtr(s string) *string { return &s }
+
+func TestBuildFiguresResultAddsStepsAndASeriesPerRowOnlyWithAnInterval(t *testing.T) {
+	graph, totals, window := seriesFixture(t)
+
+	got, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-1", Interval: stringPtr("week")}, nil, window, time.Now(), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	wantSteps := []lib.FiguresStep{
+		{Start: "2026-10-01", End: "2026-10-04", Label: "KW 40 2026"},
+		{Start: "2026-10-05", End: "2026-10-11", Label: "KW 41 2026"},
+	}
+	if !reflect.DeepEqual(got.Steps, wantSteps) {
+		t.Errorf("steps = %+v, want %+v", got.Steps, wantSteps)
+	}
+	series := map[string]any{}
+	for _, row := range got.Rows {
+		series[row.NodeId] = jsonOf(t, row.Series)
+	}
+	wantSeries := map[string]any{
+		"n-site":  []any{map[string]any{"electricity": 10.0, "gas": 2.0}, map[string]any{"electricity": 20.0, "gas": 4.0}},
+		"n-hall":  []any{map[string]any{"electricity": 4.0, "gas": 2.0}, map[string]any{"electricity": 8.0}},
+		"n-gas":   []any{map[string]any{"gas": 3.0}, map[string]any{}},
+		"n-idle":  []any{map[string]any{}, map[string]any{}},
+		"n-power": []any{map[string]any{"electricity": 4.0}, map[string]any{}},
+		"n-grid":  []any{map[string]any{}, map[string]any{}},
+		"n-off":   []any{map[string]any{}, map[string]any{}},
+	}
+	if !reflect.DeepEqual(series, wantSeries) {
+		gotRaw, _ := json.MarshalIndent(series, "", " ")
+		t.Errorf("series = %s", gotRaw)
+	}
+	// The totals stay as they were.
+	if got.Rows[1].NodeId != "n-site" || got.Rows[1].Values["electricity"] == nil || *got.Rows[1].Values["electricity"] != 30 {
+		t.Errorf("totals changed: %v", got.Rows[1].Values)
+	}
+
+	plain, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-1"}, nil, window, time.Now(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := json.Marshal(plain)
+	if strings.Contains(string(raw), `"steps"`) || strings.Contains(string(raw), `"series"`) {
+		t.Errorf("a result without an interval carries steps or series: %s", raw)
+	}
+}
+
+func TestBuildFiguresResultCutsTheSeriesToTheCarriersAndTheNode(t *testing.T) {
+	graph, totals, window := seriesFixture(t)
+	query := lib.FiguresQuery{GraphId: "graph-1", NodeId: stringPtr("n-hall"), Interval: stringPtr("week")}
+
+	got, err := buildFiguresResult(graph, totals, query, []string{"gas"}, window, time.Now(), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var ids []string
+	for _, row := range got.Rows {
+		ids = append(ids, row.NodeId)
+		if len(row.Series) != 2 {
+			t.Errorf("row %s has %d series entries, want one per step", row.NodeId, len(row.Series))
+		}
+		for _, entry := range row.Series {
+			for carrier := range entry {
+				if carrier != "gas" {
+					t.Errorf("row %s holds %s in its series", row.NodeId, carrier)
+				}
+			}
+		}
+	}
+	if !reflect.DeepEqual(ids, []string{"n-hall", "n-gas", "n-idle", "n-power"}) {
+		t.Errorf("rows = %v, want the node and what is below it", ids)
+	}
+	if hall := jsonOf(t, got.Rows[0].Series); !reflect.DeepEqual(hall, []any{map[string]any{"gas": 2.0}, map[string]any{}}) {
+		t.Errorf("n-hall series = %v", hall)
+	}
+}
+
+func TestBuildFiguresResultFailsWhenFiguresAnswersAnIntervalWithoutSeries(t *testing.T) {
+	graph, totals, window := seriesFixture(t)
+	totals.Series = nil
+	_, err := buildFiguresResult(graph, totals, lib.FiguresQuery{GraphId: "graph-1", Interval: stringPtr("week")}, nil, window, time.Now(), nil)
+	if err == nil || !strings.Contains(err.Error(), "without series") {
+		t.Errorf("error = %v, want one about the missing series", err)
+	}
+}
+
+func TestStepLabels(t *testing.T) {
+	berlin, _ := time.LoadLocation("Europe/Berlin")
+	day := func(value string) time.Time {
+		parsed, err := time.ParseInLocation("2006-01-02", value, berlin)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return parsed.Add(12 * time.Hour)
+	}
+	cases := []struct {
+		interval, start, want string
+	}{
+		{"day", "2026-10-01", "01.10.2026"},
+		{"week", "2026-10-01", "KW 40 2026"},
+		// 2026 has 53 ISO weeks: Monday 2026-12-28 opens the last one, and the first
+		// days of 2027 still belong to it.
+		{"week", "2026-12-28", "KW 53 2026"},
+		{"week", "2027-01-01", "KW 53 2026"},
+		{"week", "2027-01-04", "KW 1 2027"},
+		{"week", "2024-12-30", "KW 1 2025"},
+		{"month", "2026-10-01", "Oktober 2026"},
+		{"month", "2026-03-01", "März 2026"},
+		{"quarter", "2026-10-01", "Q4 2026"},
+		{"quarter", "2026-01-01", "Q1 2026"},
+		{"year", "2026-01-01", "2026"},
+	}
+	for _, tc := range cases {
+		if got := stepLabel(tc.interval, day(tc.start)); got != tc.want {
+			t.Errorf("%s step from %s = %q, want %q", tc.interval, tc.start, got, tc.want)
+		}
+	}
+}
+
+func TestBuildStepsReadsDaysInTheZoneWithTheEndDayIncluded(t *testing.T) {
+	berlin, _ := time.LoadLocation("Europe/Berlin")
+	series := []figures.Step{
+		{Start: "2026-10-01T00:00:00+02:00", End: "2026-11-01T00:00:00+01:00"},
+		// The clock change of 2026-10-25 lies inside this step.
+		{Start: "2026-11-01T00:00:00+01:00", End: "2027-01-01T00:00:00+01:00"},
+	}
+	got, err := buildSteps(series, "month", berlin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []lib.FiguresStep{
+		{Start: "2026-10-01", End: "2026-10-31", Label: "Oktober 2026"},
+		{Start: "2026-11-01", End: "2026-12-31", Label: "November 2026"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("steps = %+v, want %+v", got, want)
+	}
+}
+
+func TestSetReportFileDataPassesTheIntervalToFigures(t *testing.T) {
+	stub := &figuresStub{totalsBody: seriesTotals}
+	client := stub.client(t, berlinTime(t, "2026-11-23 15:30"))
+	query := lib.FiguresQuery{GraphId: "graph-1", Interval: stringPtr("week"), Period: lib.FiguresPeriod{Kind: "previousMonth"}}
+
+	got, err := client.setReportFileData(figuresReportData(query), testToken(t, "user-1"), "report-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if stub.totalsRequest["interval"] != "week" {
+		t.Errorf("figures was asked %v, want interval week", stub.totalsRequest)
+	}
+	if result := got["consumption"].(lib.FiguresResult); len(result.Steps) != 2 {
+		t.Errorf("steps = %+v", result.Steps)
+	}
+}
+
+func TestSetReportFileDataSendsNoIntervalWithoutOne(t *testing.T) {
+	stub := &figuresStub{totalsBody: figuresTotals}
+	client := stub.client(t, berlinTime(t, "2026-11-23 15:30"))
+	data := figuresReportData(lib.FiguresQuery{GraphId: "graph-1", Period: lib.FiguresPeriod{Kind: "previousMonth"}})
+
+	if _, err := client.setReportFileData(data, testToken(t, "user-1"), "report-1"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, present := stub.totalsRequest["interval"]; present {
+		t.Errorf("figures was asked %v, want no interval", stub.totalsRequest)
+	}
+}
+
+func TestSetReportFileDataRejectsAnUnknownIntervalBeforeAnyCall(t *testing.T) {
+	stub := &figuresStub{totalsBody: figuresTotals}
+	client := stub.client(t, berlinTime(t, "2026-11-23 15:30"))
+	query := lib.FiguresQuery{GraphId: "graph-1", Interval: stringPtr("hour"), Period: lib.FiguresPeriod{Kind: "previousMonth"}}
+
+	_, err := client.setReportFileData(figuresReportData(query), testToken(t, "user-1"), "report-1")
+	if err == nil || !strings.Contains(err.Error(), `unknown interval "hour"`) {
+		t.Errorf("error = %v", err)
+	}
+	if stub.graphRequests+stub.totalsRequests != 0 {
+		t.Error("a platform service was called for an invalid interval")
+	}
+}
+
+func TestSetReportFileDataPassesFiguresSentenceOfATooFineIntervalOn(t *testing.T) {
+	sentence := "the range has 731 day steps, at most 400 are allowed: use week or a shorter range"
+	stub := &figuresStub{totalsStatus: http.StatusBadRequest, totalsError: `{"error":"` + sentence + `"}`}
+	client := stub.client(t, berlinTime(t, "2026-11-23 15:30"))
+	query := lib.FiguresQuery{GraphId: "graph-1", Interval: stringPtr("day"), Period: lib.FiguresPeriod{Kind: "previousYear"}}
+
+	_, err := client.setReportFileData(figuresReportData(query), testToken(t, "user-1"), "report-1")
+
+	var rejected *FiguresRejectedError
+	if !errors.As(err, &rejected) {
+		t.Fatalf("error = %v, want a FiguresRejectedError", err)
+	}
+	if rejected.Message != sentence {
+		t.Errorf("message = %q, want figures' sentence", rejected.Message)
+	}
+}
+
+func TestSetReportFileDataKeepsOtherRefusalsOfFiguresAsTheyWere(t *testing.T) {
+	stub := &figuresStub{totalsBody: figuresTotals, totalsStatus: http.StatusInternalServerError}
+	client := stub.client(t, berlinTime(t, "2026-11-23 15:30"))
+	data := figuresReportData(lib.FiguresQuery{GraphId: "graph-1", Period: lib.FiguresPeriod{Kind: "previousMonth"}})
+
+	_, err := client.setReportFileData(data, testToken(t, "user-1"), "report-1")
+
+	var rejected *FiguresRejectedError
+	if err == nil || errors.As(err, &rejected) {
+		t.Errorf("error = %v, want a plain failure", err)
 	}
 }

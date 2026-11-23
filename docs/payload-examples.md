@@ -337,6 +337,32 @@ What the template receives as `consumption`, here for a run on 2026-11-23:
   a CHP unit without a register. They are not in `meters`, since they are no gap. A
   device whose type is unknown, also where the repository does not answer, stays a
   meter.
+- `interval` (`day`, `week`, `month`, `quarter` or `year`, optional) cuts the period
+  into calendar steps of the zone, weeks as ISO weeks from Monday, the first and last
+  step keeping the period's own bounds. The result then also carries `steps` and every
+  row a `series` with one entry per step, in the same order. Without `interval` both
+  are absent. A step is read like a period of its own, so the steps do not add up to
+  `values` exactly. An unknown value is refused with `400`, and so is a request figures
+  finds too fine (more than 400 steps), with figures' own sentence naming a coarser
+  interval or a shorter period. In a queued run the sentence is the job's `error`.
+
+```json
+{
+  "steps": [
+    { "start": "2026-12-28", "end": "2027-01-03", "label": "KW 53 2026" },
+    { "start": "2027-01-04", "end": "2027-01-10", "label": "KW 1 2027" }
+  ],
+  "rows": [
+    { "nodeId": "n-site", "name": "Werk", "values": { "electricity": 30 }, "series": [{ "electricity": 10 }, { "electricity": 20 }] },
+    { "nodeId": "n-idle", "name": "n-idle", "values": {}, "series": [{}, {}] }
+  ]
+}
+```
+
+Labels are `01.10.2026` (day), `KW 40 2026` (week, ISO year), `Oktober 2026` (month),
+`Q4 2026` and `2026`. A template draws a table or chart per row with
+`{{#each series}}` next to `{{#each ../steps}}`.
+
 - A refusal of the graph by the device repository or figures (for example 403 on a
   graph the report owner may not read) fails the run with a message naming the
   service, the status and the start of the answer. Devices the owner may not read are

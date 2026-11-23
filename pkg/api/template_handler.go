@@ -67,6 +67,7 @@ func allowTemplateAuthor(c *gin.Context, reportingClient report_engine.Client) b
 func templateFailed(c *gin.Context, message string, forbidden string, err error) {
 	util.Logger.Error(message, "error", err)
 	var apiErr *jsreport.APIError
+	var rejected *report_engine.FiguresRejectedError
 	detail := ""
 	if errors.As(err, &apiErr) {
 		detail = apiErr.Message
@@ -88,6 +89,8 @@ func templateFailed(c *gin.Context, message string, forbidden string, err error)
 		c.JSON(http.StatusConflict, gin.H{"error": withDetail("a template or data with this name already exists", detail)})
 	case errors.Is(err, lib.ErrRejected):
 		c.JSON(http.StatusBadRequest, gin.H{"error": withDetail("the report engine rejected the template", detail)})
+	case errors.As(err, &rejected):
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	case errors.Is(err, report_engine.ErrPreviewData):
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
 	default:

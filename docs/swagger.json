@@ -67,6 +67,12 @@
                             "type": "string"
                         }
                     },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -103,6 +109,12 @@
                             "additionalProperties": {
                                 "type": "string"
                             }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
                         }
                     },
                     "500": {
@@ -199,6 +211,12 @@
                             "additionalProperties": {
                                 "type": "string"
                             }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
                         }
                     },
                     "500": {
@@ -844,6 +862,17 @@
                 },
                 "graphId": {
                     "type": "string"
+                },
+                "interval": {
+                    "description": "Interval cuts the period into calendar steps (day, week, month, quarter or\nyear) and adds the steps and a series per row to the result. Absent: totals only.",
+                    "type": "string",
+                    "enum": [
+                        "day",
+                        "week",
+                        "month",
+                        "quarter",
+                        "year"
+                    ]
                 },
                 "nodeId": {
                     "description": "NodeId narrows the rows to this node and everything below it.",

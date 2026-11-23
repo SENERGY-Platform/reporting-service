@@ -57,6 +57,15 @@ type TotalsRequest struct {
 	TimeZone string `json:"timeZone"`
 	Routing  string `json:"routing,omitempty"`
 	Net      bool   `json:"net"`
+	// Interval asks for series as well: day, week, month, quarter or year.
+	Interval string `json:"interval,omitempty"`
+}
+
+// Step is one calendar step of a series, answered like the totals of its window.
+type Step struct {
+	Start  string                         `json:"start"`
+	End    string                         `json:"end"`
+	Totals map[string]map[string]*float64 `json:"totals"`
 }
 
 type Position struct {
@@ -83,6 +92,8 @@ type TotalsResponse struct {
 	Totals           map[string]map[string]*float64 `json:"totals"`
 	// GenerationByDevice is the feed-in registers per device in kWh.
 	GenerationByDevice map[string]map[string]float64 `json:"generationByDevice"`
+	// Series is absent without an interval.
+	Series []Step `json:"series"`
 }
 
 // Totals totals the consumption per node of a graph with the caller's token.

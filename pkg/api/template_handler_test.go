@@ -26,10 +26,13 @@ import (
 	"testing"
 
 	"github.com/SENERGY-Platform/reporting-service/lib"
+	"github.com/SENERGY-Platform/reporting-service/pkg/apis/device_repository"
+	"github.com/SENERGY-Platform/reporting-service/pkg/apis/figures"
 	"github.com/SENERGY-Platform/reporting-service/pkg/apis/jsreport"
 	"github.com/SENERGY-Platform/reporting-service/pkg/config"
 	"github.com/SENERGY-Platform/reporting-service/pkg/report_engine"
 	"github.com/gin-gonic/gin"
+	"github.com/go-resty/resty/v2"
 )
 
 // authoringDriver records what the template endpoints ask of the report engine.
@@ -442,6 +445,7 @@ func TestPreviewRefusesInvalidInput(t *testing.T) {
 		"bad recipe":      {"/templates/preview", `{"template":{"recipe":"html","content":"x"}}`},
 		"empty content":   {"/templates/preview", `{"template":{"recipe":"chrome-pdf","content":""}}`},
 		"unknown as":      {"/templates/preview?as=pdf", `{"templateId":"t1"}`},
+		"bad interval":    {"/templates/preview", `{"template":{"recipe":"chrome-pdf","content":"x"},"data":{"c":{"name":"c","valueType":"object","figuresQuery":{"graphId":"g","interval":"hour","period":{"kind":"previousMonth"}}}}}`},
 		"helper override": {"/templates/preview", `{"template":{"recipe":"chrome-pdf","content":"x","helpers":"function date(v) {}"}}`},
 	}
 	for name, tc := range cases {
@@ -528,5 +532,40 @@ func TestUnknownTemplateIsNotFound(t *testing.T) {
 		if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), MessageTemplateNotFound) {
 			t.Errorf("%s %s = %d %q, want 404", call.method, call.path, rec.Code, rec.Body.String())
 		}
+	}
+}
+
+// figures' 400 for too many steps is the author's to fix, so it is no 422 or 500.
+func TestPreviewPassesFiguresSentenceForTooManyStepsOnAsA400(t *testing.T) {
+	sentence := "the range has 731 day steps, at most 400 are allowed: use week or a shorter range"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/consumption/totals") {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"` + sentence + `"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"id":"g","nodes":[],"edges":[]}`))
+	}))
+	defer srv.Close()
+	driver := &authoringDriver{}
+	client := &report_engine.Client{
+		Driver:           driver,
+		Config:           &config.Config{Templates: configured()},
+		Figures:          &figures.Client{BaseUrl: srv.URL + "/figures", HttpClient: resty.New()},
+		DeviceRepository: &device_repository.Client{BaseUrl: srv.URL, HttpClient: resty.New()},
+	}
+	engine, err := CreateServer(&config.Config{ServerPort: 8080}, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := `{"template":{"recipe":"chrome-pdf","content":"x"},"data":{"consumption":{"name":"consumption","valueType":"object","figuresQuery":{"graphId":"g","interval":"day","period":{"kind":"fixed","start":"2025-01-01","end":"2026-12-31"}}}}}`
+
+	rec := send(t, engine, http.MethodPost, "/templates/preview", body, bearerWithRoles("u1", testAuthorRole))
+
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), sentence) {
+		t.Errorf("status = %d body %q, want 400 with figures' sentence", rec.Code, rec.Body.String())
+	}
+	if len(driver.rendered) != 0 {
+		t.Error("nothing may be rendered when figures refused the query")
 	}
 }

@@ -124,6 +124,9 @@ func validateTemplateInput(input lib.TemplateInput) error {
 
 // validatePreviewRequest wants exactly one of a draft and a stored template's id.
 func validatePreviewRequest(request lib.TemplatePreviewRequest) error {
+	if err := lib.ValidateFiguresIntervals(request.Data); err != nil {
+		return err
+	}
 	if (request.Template == nil) == (request.TemplateId == "") {
 		return errors.New("give either template or templateId")
 	}

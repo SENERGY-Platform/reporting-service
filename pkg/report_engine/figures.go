@@ -17,6 +17,7 @@
 package report_engine
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -216,6 +217,9 @@ func (r *Client) figuresData(authToken string, query lib.FiguresQuery) (lib.Figu
 	if err != nil {
 		return lib.FiguresResult{}, err
 	}
+	if err = lib.ValidateInterval(query.Interval); err != nil {
+		return lib.FiguresResult{}, err
+	}
 	now := r.clock()
 	window, err := resolvePeriod(query.Period, now)
 	if err != nil {
@@ -227,14 +231,22 @@ func (r *Client) figuresData(authToken string, query lib.FiguresQuery) (lib.Figu
 	}
 	// Asked for the whole graph even with a node: figures answers one node's total
 	// only, while the rows hold every node below it.
-	totals, err := r.Figures.Totals(authToken, figures.TotalsRequest{
+	request := figures.TotalsRequest{
 		GraphId:  query.GraphId,
 		Range:    figures.Range{Start: window.start.Format(time.RFC3339), End: window.end.Format(time.RFC3339)},
 		TimeZone: window.location.String(),
 		Routing:  "edges",
 		Net:      true,
-	})
+	}
+	if query.Interval != nil {
+		request.Interval = *query.Interval
+	}
+	totals, err := r.Figures.Totals(authToken, request)
 	if err != nil {
+		if rejected := figuresRejection(err); rejected != nil {
+			util.Logger.Warn("figures rejected the query", "graph_id", query.GraphId, "error", rejected.Error())
+			return lib.FiguresResult{}, rejected
+		}
 		return lib.FiguresResult{}, loggedPlatformError("reading the consumption from figures", query.GraphId, err)
 	}
 	return buildFiguresResult(graph, totals, query, carriers, window, now, r.deviceTypes(authToken, graph, totals))
@@ -263,6 +275,38 @@ func (r *Client) deviceTypes(authToken string, graph device_repository.Graph, to
 		return nil
 	}
 	return types
+}
+
+// FiguresRejectedError is a 400 of figures, such as too many steps for an interval.
+// The message is figures' own sentence, which names what to change.
+type FiguresRejectedError struct {
+	Message string
+}
+
+func (e *FiguresRejectedError) Error() string {
+	return "figures rejected the query: " + e.Message
+}
+
+// figuresRejection returns the 400 of figures as an error the API can pass on, and
+// nil for any other failure.
+func figuresRejection(err error) *FiguresRejectedError {
+	var statusErr *figures.StatusError
+	if !errors.As(err, &statusErr) || statusErr.Status != http.StatusBadRequest {
+		return nil
+	}
+	message := statusErr.Body
+	var body struct {
+		Error   string `json:"error"`
+		Message string `json:"message"`
+	}
+	if json.Unmarshal([]byte(statusErr.Body), &body) == nil {
+		if body.Error != "" {
+			message = body.Error
+		} else if body.Message != "" {
+			message = body.Message
+		}
+	}
+	return &FiguresRejectedError{Message: oneLine(message)}
 }
 
 func loggedPlatformError(doing string, graphId string, err error) error {
@@ -431,6 +475,14 @@ func buildFiguresResult(graph device_repository.Graph, totals figures.TotalsResp
 		sort.Slice(children[parent], func(i, j int) bool { return less(children[parent][i], children[parent][j]) })
 	}
 
+	var steps []lib.FiguresStep
+	if query.Interval != nil {
+		var err error
+		if steps, err = buildSteps(totals.Series, *query.Interval, window.location); err != nil {
+			return lib.FiguresResult{}, err
+		}
+	}
+
 	result := lib.FiguresResult{
 		Graph:       lib.FiguresRef{Id: query.GraphId, Name: graphName(graph)},
 		Period:      window.resolved(),
@@ -439,6 +491,7 @@ func buildFiguresResult(graph device_repository.Graph, totals figures.TotalsResp
 		NotMeters:   []lib.FiguresNotMeter{},
 		Generation:  []lib.FiguresPlant{},
 		GeneratedAt: now.In(window.location).Format(time.RFC3339),
+		Steps:       steps,
 	}
 	var roots []string
 	if query.NodeId != nil {
@@ -478,6 +531,9 @@ func buildFiguresResult(graph device_repository.Graph, totals figures.TotalsResp
 				Depth:     len(path) - 1,
 				Values:    rowValues(totals.Totals[id], carriers),
 				AlsoUnder: []string{},
+			}
+			if steps != nil {
+				row.Series = rowSeries(totals.Series, id, carriers)
 			}
 			if under != "" {
 				for _, link := range parents[id] {
@@ -542,6 +598,65 @@ func rowValues(values map[string]*float64, carriers []string) map[string]*float6
 		}
 	}
 	return row
+}
+
+// rowSeries is the values of a node in every step, cut to the carriers like the row's
+// totals. A step that holds nothing for the node gives an empty object.
+func rowSeries(series []figures.Step, nodeId string, carriers []string) []map[string]*float64 {
+	out := make([]map[string]*float64, len(series))
+	for i, step := range series {
+		out[i] = rowValues(step.Totals[nodeId], carriers)
+	}
+	return out
+}
+
+var germanMonths = []string{"Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"}
+
+// buildSteps turns the steps of figures into days of the zone with a German label.
+// Figures cuts at midnight and ends a step at the start of the next one, so the end
+// day is the day before the end instant.
+func buildSteps(series []figures.Step, interval string, loc *time.Location) ([]lib.FiguresStep, error) {
+	if len(series) == 0 {
+		return nil, errors.New("figures answered without series for the interval")
+	}
+	steps := make([]lib.FiguresStep, 0, len(series))
+	for _, step := range series {
+		start, err := time.Parse(time.RFC3339, step.Start)
+		if err != nil {
+			return nil, fmt.Errorf("figures answered a step start %q that is no instant", step.Start)
+		}
+		end, err := time.Parse(time.RFC3339, step.End)
+		if err != nil {
+			return nil, fmt.Errorf("figures answered a step end %q that is no instant", step.End)
+		}
+		sy, sm, sd := start.In(loc).Date()
+		ey, em, ed := end.In(loc).Date()
+		steps = append(steps, lib.FiguresStep{
+			Start: time.Date(sy, sm, sd, 12, 0, 0, 0, loc).Format(dayLayout),
+			// Noon exists in every zone, midnight may not.
+			End:   time.Date(ey, em, ed-1, 12, 0, 0, 0, loc).Format(dayLayout),
+			Label: stepLabel(interval, time.Date(sy, sm, sd, 12, 0, 0, 0, loc)),
+		})
+	}
+	return steps, nil
+}
+
+// stepLabel names the step that starts on the given day. A week is named after its
+// ISO year, which differs from the calendar year around New Year.
+func stepLabel(interval string, start time.Time) string {
+	switch interval {
+	case lib.IntervalDay:
+		return start.Format("02.01.2006")
+	case lib.IntervalWeek:
+		year, week := start.ISOWeek()
+		return fmt.Sprintf("KW %d %d", week, year)
+	case lib.IntervalMonth:
+		return fmt.Sprintf("%s %d", germanMonths[start.Month()-1], start.Year())
+	case lib.IntervalQuarter:
+		return fmt.Sprintf("Q%d %d", (int(start.Month())-1)/3+1, start.Year())
+	default:
+		return fmt.Sprintf("%d", start.Year())
+	}
 }
 
 func occurringCarriers(rows []lib.FiguresRow) []string {

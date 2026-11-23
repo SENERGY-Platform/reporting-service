@@ -16,6 +16,8 @@
 
 package lib
 
+import "fmt"
+
 // FiguresQuery asks the figures service for the consumption of a unit graph over a
 // calendar period. The resolved answer replaces the report object in the data
 // handed to the template, in the form of FiguresResult.
@@ -26,6 +28,48 @@ type FiguresQuery struct {
 	// Carriers narrows the figures, default every carrier that occurs.
 	Carriers []string      `json:"carriers,omitempty"`
 	Period   FiguresPeriod `json:"period"`
+	// Interval cuts the period into calendar steps (day, week, month, quarter or
+	// year) and adds the steps and a series per row to the result. Absent: totals only.
+	Interval *string `json:"interval,omitempty" enums:"day,week,month,quarter,year"`
+}
+
+const (
+	IntervalDay     = "day"
+	IntervalWeek    = "week"
+	IntervalMonth   = "month"
+	IntervalQuarter = "quarter"
+	IntervalYear    = "year"
+)
+
+// ValidateInterval accepts an absent interval and the five known ones.
+func ValidateInterval(interval *string) error {
+	if interval == nil {
+		return nil
+	}
+	switch *interval {
+	case IntervalDay, IntervalWeek, IntervalMonth, IntervalQuarter, IntervalYear:
+		return nil
+	}
+	return fmt.Errorf("unknown interval %q, use day, week, month, quarter or year", *interval)
+}
+
+// ValidateFiguresIntervals checks the interval of every figuresQuery in report data,
+// so a bad one fails at the API edge and not in a job.
+func ValidateFiguresIntervals(data map[string]ReportObject) error {
+	for key, object := range data {
+		if object.FiguresQuery != nil {
+			if err := ValidateInterval(object.FiguresQuery.Interval); err != nil {
+				return fmt.Errorf("report object %s: %w", key, err)
+			}
+		}
+		if err := ValidateFiguresIntervals(object.Fields); err != nil {
+			return err
+		}
+		if err := ValidateFiguresIntervals(object.Children); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // FiguresPeriod is a calendar period, resolved against the time of the run.
@@ -76,6 +120,18 @@ type FiguresResult struct {
 	Generation []FiguresPlant `json:"generation"`
 	// GeneratedAt is an RFC 3339 instant.
 	GeneratedAt string `json:"generatedAt"`
+	// Steps are the calendar steps of the period in order, only with an interval.
+	// Every row's Series has one entry per step.
+	Steps []FiguresStep `json:"steps,omitempty"`
+}
+
+// FiguresStep is one step of an interval. Start and End are days as YYYY-MM-DD in
+// the report's zone with the end day included, Label is German, such as
+// "KW 40 2026", "Oktober 2026" or "Q4 2026".
+type FiguresStep struct {
+	Start string `json:"start"`
+	End   string `json:"end"`
+	Label string `json:"label"`
 }
 
 type FiguresRef struct {
@@ -108,6 +164,11 @@ type FiguresRow struct {
 	// Generation is the kWh per carrier that the plants at and below this node made,
 	// not weighted by shares, and absent where there are none.
 	Generation map[string]float64 `json:"generation,omitempty"`
+	// Series is the values of the node per step, in the order of the result's Steps,
+	// only with an interval. A step with nothing for the node is an empty object.
+	// The steps do not add up to Values exactly: each is read from its first to its
+	// last reading.
+	Series []map[string]*float64 `json:"series,omitempty"`
 }
 
 // FiguresMeter is the data coverage of one device node. First and Last are the days

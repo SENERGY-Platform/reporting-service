@@ -120,6 +120,7 @@ func getTemplatePreview(reportingClient report_engine.Client) (string, string, g
 // @Produce json
 // @Param report body lib.Report true "Report"
 // @Success	202 {object} map[string]string
+// @Failure	400 {string} str
 // @Failure	500 {string} str
 // @Router /report/create [post]
 func postReportCreate(reportingClient report_engine.Client) (string, string, gin.HandlerFunc) {
@@ -128,6 +129,10 @@ func postReportCreate(reportingClient report_engine.Client) (string, string, gin
 		if err := c.ShouldBindJSON(&request); err != nil {
 			util.Logger.Error(MessageParseError, "error", err)
 			_ = c.Error(errors.New(MessageSomethingWrong))
+			return
+		}
+		if err := lib.ValidateFiguresIntervals(request.Data); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		reportId, jobId, err := reportingClient.EnqueueReportFileCreation(request, c.GetHeader(HeaderAuthorization))
@@ -213,6 +218,7 @@ func getReportJobs(reportingClient report_engine.Client) (string, string, gin.Ha
 // @Produce json
 // @Param report body lib.Report true "Report"
 // @Success	200 {object} map[string]string
+// @Failure	400 {string} str
 // @Failure	500 {string} str
 // @Router /report [post]
 func postReport(reportingClient report_engine.Client) (string, string, gin.HandlerFunc) {
@@ -221,6 +227,10 @@ func postReport(reportingClient report_engine.Client) (string, string, gin.Handl
 		if err := c.ShouldBindJSON(&request); err != nil {
 			util.Logger.Error(MessageParseError, "error", err)
 			_ = c.Error(errors.New(MessageSomethingWrong))
+			return
+		}
+		if err := lib.ValidateFiguresIntervals(request.Data); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		saved, err := reportingClient.SaveReportModel(request, c.GetHeader(HeaderAuthorization))
@@ -240,6 +250,7 @@ func postReport(reportingClient report_engine.Client) (string, string, gin.Handl
 // @Produce json
 // @Param report body lib.Report true "Report"
 // @Success	200 {string} str
+// @Failure	400 {string} str
 // @Failure	500 {string} str
 // @Router /report [put]
 func putReport(reportingClient report_engine.Client) (string, string, gin.HandlerFunc) {
@@ -248,6 +259,10 @@ func putReport(reportingClient report_engine.Client) (string, string, gin.Handle
 		if err := c.ShouldBindJSON(&request); err != nil {
 			util.Logger.Error(MessageParseError, "error", err)
 			_ = c.Error(errors.New(MessageSomethingWrong))
+			return
+		}
+		if err := lib.ValidateFiguresIntervals(request.Data); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		err := reportingClient.UpdateReportModel(request, c.GetHeader(HeaderAuthorization))
