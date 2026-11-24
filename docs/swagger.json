@@ -665,7 +665,7 @@
         },
         "/templates/preview": {
             "post": {
-                "description": "Renders a draft or a stored template with report data, which is resolved like in a real run including figuresQuery. Nothing is stored and no job is created. A stored template is rendered by its id, so its engine and settings apply as in a run, and without data its sample data is used. The answer is a PNG of the top of the page in a viewport of 1200 by 1600 pixels, not the whole page, or with as=file the file of the template's own recipe. Needs the realm role from TEMPLATE_AUTHOR_ROLE.",
+                "description": "Renders a draft or a stored template with report data, which is resolved like in a real run including figuresQuery. Nothing is stored and no job is created. A stored template is rendered by its id, so its engine and settings apply as in a run, and without data its sample data is used. The answer is a PNG of the top of the page in a viewport of 1200 by 1600 pixels, not the whole page, or with as=file the file of the template's own recipe. Needs the realm role from TEMPLATE_AUTHOR_ROLE. An account renders one preview at a time, another one meanwhile is answered with 429.",
                 "consumes": [
                     "application/json"
                 ],
@@ -727,6 +727,12 @@
                             "type": "string"
                         }
                     },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -761,6 +767,12 @@
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
                         "schema": {
                             "type": "string"
                         }

@@ -99,11 +99,17 @@ func getTemplate(reportingClient report_engine.Client) (string, string, gin.Hand
 // @Param id path string true "Template ID"
 // @Success	200
 // @Failure	401 {string} str
+// @Failure	429 {string} str
 // @Failure	500 {string} str
 // @Router /templates/preview/:id [get]
 func getTemplatePreview(reportingClient report_engine.Client) (string, string, gin.HandlerFunc) {
 	return http.MethodGet, "/templates/preview/:id", func(c *gin.Context) {
 		id := c.Param("id")
+		leave, ok := enterPreview(c)
+		if !ok {
+			return
+		}
+		defer leave()
 		content, contentType, _, err := reportingClient.GetTemplatePreviewById(id, c.GetHeader(HeaderAuthorization))
 		if err != nil {
 			failed(c, "could not get template preview "+id, err)

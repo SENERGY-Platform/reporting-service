@@ -215,7 +215,7 @@ func deleteTemplate(reportingClient report_engine.Client) (string, string, gin.H
 
 // postTemplatePreview godoc
 // @Summary Preview a template draft
-// @Description	Renders a draft or a stored template with report data, which is resolved like in a real run including figuresQuery. Nothing is stored and no job is created. A stored template is rendered by its id, so its engine and settings apply as in a run, and without data its sample data is used. The answer is a PNG of the top of the page in a viewport of 1200 by 1600 pixels, not the whole page, or with as=file the file of the template's own recipe. Needs the realm role from TEMPLATE_AUTHOR_ROLE.
+// @Description	Renders a draft or a stored template with report data, which is resolved like in a real run including figuresQuery. Nothing is stored and no job is created. A stored template is rendered by its id, so its engine and settings apply as in a run, and without data its sample data is used. The answer is a PNG of the top of the page in a viewport of 1200 by 1600 pixels, not the whole page, or with as=file the file of the template's own recipe. Needs the realm role from TEMPLATE_AUTHOR_ROLE. An account renders one preview at a time, another one meanwhile is answered with 429.
 // @Tags Template
 // @Accept json
 // @Produce png
@@ -227,6 +227,7 @@ func deleteTemplate(reportingClient report_engine.Client) (string, string, gin.H
 // @Failure	403 {string} str
 // @Failure	404 {string} str
 // @Failure	422 {string} str
+// @Failure	429 {string} str
 // @Failure	500 {string} str
 // @Router /templates/preview [post]
 func postTemplatePreview(reportingClient report_engine.Client) (string, string, gin.HandlerFunc) {
@@ -248,6 +249,11 @@ func postTemplatePreview(reportingClient report_engine.Client) (string, string, 
 			invalidInput(c, err)
 			return
 		}
+		leave, ok := enterPreview(c)
+		if !ok {
+			return
+		}
+		defer leave()
 		content, contentType, err := reportingClient.PreviewTemplate(request, as == "file", c.GetHeader(HeaderAuthorization))
 		if err != nil {
 			templateFailed(c, "could not render the template preview", MessageForbidden, err)
